@@ -42,5 +42,5 @@ interface FlowchartFactoryInterface
      *
      * @throws FlowchartBuildException
      */
-    public function create(array $flowchartDefinition, bool $allowUnhandledSteps = true): Flowchart;
+    public function create(array $flowchartDefinition, bool $allowUnhandledCases = true): Flowchart;
 }

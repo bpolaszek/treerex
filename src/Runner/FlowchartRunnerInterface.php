@@ -18,5 +18,5 @@ interface FlowchartRunnerInterface
         mixed $subject,
         Flowchart|string $flowchart,
         (ArrayAccess&Traversable)|array $context = new ArrayObject(),
-    ): bool;
+    ): bool|int|string;
 }

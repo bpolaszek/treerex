@@ -6,8 +6,6 @@ namespace BenTools\TreeRex\Definition;
 
 use ArrayAccess;
 use ArrayObject;
-use BenTools\TreeRex\Action\Action;
-use BenTools\TreeRex\Action\UnhandledStep;
 use Traversable;
 
 /**
@@ -21,10 +19,9 @@ final readonly class DecisionNode
     public function __construct(
         public string $checkerServiceId,
         public string $id,
+        public Cases $cases,
         public ?string $label = null,
         public mixed $criteria = null,
-        public Action|DecisionNode $whenYes = new UnhandledStep(),
-        public Action|DecisionNode $whenNo = new UnhandledStep(),
         public ArrayAccess&Traversable $context = new ArrayObject(),
     ) {
     }

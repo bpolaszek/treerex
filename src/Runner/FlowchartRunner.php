@@ -33,7 +33,7 @@ final readonly class FlowchartRunner implements FlowchartRunnerInterface
         mixed $subject,
         Flowchart|string $flowchart,
         (ArrayAccess&Traversable)|array $context = new ArrayObject(),
-    ): bool {
+    ): bool|int|string {
         $context = is_array($context) ? new ArrayObject($context) : $context;
         $flowchart = $flowchart instanceof Flowchart ? $flowchart : $this->resolveFlowchart($flowchart);
 
@@ -49,7 +49,7 @@ final readonly class FlowchartRunner implements FlowchartRunnerInterface
     /**
      * @throws SkippedSteps
      */
-    private function process(RunnerState $state): bool
+    private function process(RunnerState $state): bool|int|string
     {
         $decisionNode = $state->decisionNode;
         try {
@@ -59,10 +59,7 @@ final readonly class FlowchartRunner implements FlowchartRunnerInterface
         }
         $state = $state->withLastResult($lastResult, $decisionNode);
 
-        $next = match ($lastResult) {
-            true => $decisionNode->whenYes,
-            false => $decisionNode->whenNo,
-        };
+        $next = $decisionNode->cases->get($lastResult);
 
         if ($next instanceof DecisionNode) {
             $state = $state->with(decisionNode: $next, checker: $this->resolveCheckerService($next->checkerServiceId));
@@ -75,7 +72,7 @@ final readonly class FlowchartRunner implements FlowchartRunnerInterface
             };
         } catch (SkippedSteps $e) {
             $next = $state->flowchart->findDecisionNodeById($e->decisionNodeId)
-                ?? throw new FlowchartRuntimeException($state, "Id {$e->decisionNodeId} not found.");
+                ?? throw new FlowchartRuntimeException($state, "Id `{$e->decisionNodeId}` not found.");
 
             return $this->process($state->with($next, checker: $this->resolveCheckerService($next->checkerServiceId)));
         }

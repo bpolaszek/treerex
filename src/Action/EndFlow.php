@@ -18,12 +18,12 @@ final readonly class EndFlow extends Action
      * @param ArrayAccess<string, mixed>&Traversable<string, mixed> $context
      */
     public function __construct(
-        public ?bool $result,
+        public bool|int|string|null $result,
         public ArrayAccess&Traversable $context = new ArrayObject(),
     ) {
     }
 
-    public function __invoke(RunnerState $state): bool
+    public function __invoke(RunnerState $state): bool|int|string
     {
         return $state
             ->withAppendedContext($this->context)

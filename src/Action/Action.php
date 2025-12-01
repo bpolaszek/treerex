@@ -13,5 +13,5 @@ use BenTools\TreeRex\Runner\RunnerState;
  */
 abstract readonly class Action
 {
-    abstract public function __invoke(RunnerState $state): bool;
+    abstract public function __invoke(RunnerState $state): bool|int|string;
 }

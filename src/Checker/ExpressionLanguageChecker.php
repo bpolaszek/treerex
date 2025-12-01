@@ -6,13 +6,11 @@ namespace BenTools\TreeRex\Checker;
 
 use ArrayAccess;
 use InvalidArgumentException;
-use RuntimeException;
 use Symfony\Component\ExpressionLanguage\ExpressionLanguage;
 use Traversable;
 
 use function array_all;
 use function get_debug_type;
-use function is_bool;
 
 final readonly class ExpressionLanguageChecker implements CheckerInterface
 {
@@ -22,13 +20,13 @@ final readonly class ExpressionLanguageChecker implements CheckerInterface
     ) {
     }
 
-    public function satisfies(mixed $subject, mixed $criteria, ArrayAccess&Traversable $context): bool
+    public function satisfies(mixed $subject, mixed $criteria, ArrayAccess&Traversable $context): string|int|bool
     {
         $criteriaType = get_debug_type($criteria);
 
         return match ($criteriaType) {
             'string' => $this->check($criteria, $subject, $context), // @phpstan-ignore argument.type
-            'array' => array_all($criteria, fn ($expression) => $this->check($expression, $subject, $context)), // @phpstan-ignore argument.type, argument.type
+            'array' => array_all($criteria, fn ($expression) => $this->check($expression, $subject, $context)), // @phpstan-ignore argument.type, argument.type, argument.type
             default => throw new InvalidArgumentException('Invalid criteria type: '.$criteriaType.'. Must be a string or an array of strings.'),
         };
     }
@@ -36,17 +34,13 @@ final readonly class ExpressionLanguageChecker implements CheckerInterface
     /**
      * @param ArrayAccess<string, mixed>&Traversable<string, mixed> $context
      */
-    private function check(string $expression, mixed $subject, ArrayAccess&Traversable $context): bool
+    private function check(string $expression, mixed $subject, ArrayAccess&Traversable $context): string|int|bool
     {
         $result = $this->expressionLanguage->evaluate($expression, [
             $this->subjectVariable => $subject,
             'context' => (object) [...$context],
         ]);
 
-        if (!is_bool($result)) {
-            throw new RuntimeException('ExpressionLanguage did not return a boolean.');
-        }
-
-        return $result;
+        return $result; // @phpstan-ignore return.type
     }
 }

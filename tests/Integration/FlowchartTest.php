@@ -29,42 +29,42 @@ entrypoint:
     label: Ensure product is in stock 
     checker: default
     criteria: product.stock > 0
-    when@no:
+    when@false:
         end: 
             result: false
             context:
                 reason: Out of stock
-    when@yes:
+    when@true:
         id: blacklist_check
         label: Ensure product is allowed to be purchased    
         checker: default
         criteria: "product.blacklisted"
-        when@yes:
+        when@true:
             id: role_check
             checker: default
             criteria: context.user.role === 'ADMIN'
-            when@no:
+            when@false:
                 end: 
                     result: false
                     context:
                         reason: Product is blacklisted
-            when@yes:
+            when@true:
                 goto: category_check
-        when@no:
+        when@false:
             id: category_check
             label: Ensure product is categorized 
             checker: default
             criteria: product.categorized
-            when@no:
+            when@false:
                 error: Product should never be uncategorized
-            when@yes:
+            when@true:
                 id: expiration_check
                 label: Ensure product is not expired 
                 checker: default
                 criteria: "!product.expired"
-                when@yes:
+                when@true:
                     end: true
-                #when@no # <-- this step has not been configured 😬
+                #when@false # <-- this step has not been configured 😬
 YAML;
 
 describe('Flowchart Runner Test', function () use ($definition) {
@@ -204,7 +204,7 @@ describe('Flowchart Anomalies', function () {
         $flowchart = new FlowchartFactory()->create([
             'entrypoint' => [
                 'checker' => 'default',
-                'when@yes' => [
+                'when@true' => [
                     'goto' => 'neverland',
                 ],
             ],
@@ -216,7 +216,7 @@ describe('Flowchart Anomalies', function () {
         $subject = new stdClass();
         $context = new ArrayObject([]);
         expect(fn () => $runner->satisfies($subject, $flowchart, $context))
-            ->toThrow(FlowchartRuntimeException::class, 'Id neverland not found.');
+            ->toThrow(FlowchartRuntimeException::class, 'Id `neverland` not found.');
     });
 });
 
@@ -225,7 +225,7 @@ it('fetches a FLowchart from the service container', function () {
 entrypoint:
     checker: checker.default
     criteria: product.stock > 0
-    when@yes: 
+    when@true: 
         end: true
 YAML;
 

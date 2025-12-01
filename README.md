@@ -6,7 +6,7 @@ Forget about 300‑line `if/else` chains and scattered business rules: keep your
 
 This library lets you:
 
-- Describe a flowchart as YAML, using **decision nodes** (`when@yes`, `when@no`) and **actions** (`end`, `error`, `goto`).
+- Describe a flowchart as YAML, using **decision nodes** (`when@true`, `when@false`) and **actions** (`end`, `error`, `goto`).
 - Plug your own business rules by implementing `CheckerInterface` services.
 - Inject any PSR‑11 container so the runner can resolve your checkers (and even flowcharts) from it.
 - Inspect the **runtime state** and **history** of the flowchart execution.
@@ -101,101 +101,101 @@ entrypoint:
   checker: checker.default
   criteria: product.blacklisted
 
-  when@yes:
+  when@true:
     end:
       result: false
       context:
         decision: "reject"
         reason: "Product not available"
 
-  when@no:
+  when@false:
     id: expiry_check
     label: "Is product expired?"
     checker: checker.default
     criteria: product.expired
 
-    when@yes:
+    when@true:
       end:
         result: false
         context:
           decision: "reject"
           reason: "Product expired"
 
-    when@no:
+    when@false:
       id: stock_check
       label: "Is product in stock?"
       checker: checker.default
       criteria: product.stock > 0
 
-      when@no:
+      when@false:
         end:
           result: false
           context:
             decision: "reject"
             reason: "Out of stock"
 
-      when@yes:
+      when@true:
         id: category_restricted
         label: "Is category restricted?"
         checker: checker.default
         criteria: product.category == 'restricted'
 
         # Restricted category → customer must be >= 18
-        when@yes:
+        when@true:
           id: age_check
           label: "Customer age >= 18?"
           checker: checker.default
           criteria: context.customer.age >= 18
 
-          when@no:
+          when@false:
             end:
               result: false
               context:
                 decision: "reject"
                 reason: "Age restriction"
 
-          when@yes:
+          when@true:
             goto: payment_check
 
         # Not restricted → either standard or prescription
-        when@no:
+        when@false:
           id: category_standard
           label: "Is category standard?"
           checker: checker.default
           criteria: product.category == 'standard'
 
           # Standard category → go straight to payment check
-          when@yes:
+          when@true:
             goto: payment_check
 
           # Otherwise we expect a prescription category
-          when@no:
+          when@false:
             id: category_prescription
             label: "Is category prescription?"
             checker: checker.default
             criteria: product.category == 'prescription'
 
-            when@no:
+            when@false:
               end:
                 result: false
                 context:
                   decision: "reject"
                   reason: "Unsupported category"
 
-            when@yes:
+            when@true:
               id: prescription_check
               label: "Has valid prescription?"
               checker: checker.default
               criteria: context.prescription.valid
 
-              when@no:
+              when@false:
                 end:
                   result: false
                   context:
                     decision: "reject"
                     reason: "No valid prescription"
 
-              when@yes:
+              when@true:
                 goto: payment_check
 
           # Shared payment check for all accepted categories
@@ -205,14 +205,14 @@ payment_check:
   checker: checker.default
   criteria: context.payment.valid
 
-  when@no:
+  when@false:
     end:
       result: false
       context:
         decision: "reject"
         reason: "Invalid payment"
 
-  when@yes:
+  when@true:
     end:
       result: true
       context:
@@ -318,25 +318,25 @@ entrypoint:
   checker: app.checker.product # <-- That's how your ProductChecker is registered in your DI container.
   criteria: in_stock # <-- The criteria passed to the checker.
 
-  when@no:
+  when@false:
     end:
       result: false
       context: # <-- This context will be merged with the root context. This is optional.
         reason: "Out of stock"
 
-  when@yes:
+  when@true:
     id: blacklist_check
     label: "Ensure product is not blacklisted"
     checker: app.checker.product
     criteria: is_blacklisted
 
-    when@yes:
+    when@true:
       end:
         result: false
         context:
           reason: "Product is blacklisted"
 
-    when@no:
+    when@false:
       end:
         result: true
         context:
@@ -463,7 +463,7 @@ A `Flowchart` is made of:
 
 - a global `context` (optional),
 - an `entrypoint` decision node,
-- other decision nodes reachable through `when@yes` / `when@no` or `goto`.
+- other decision nodes reachable through `when@true` / `when@false` or `goto`.
 
 You normally won't construct `Flowchart` manually – instead, you:
 
@@ -478,11 +478,11 @@ A **decision node** describes:
 - `id` – a unique id for the node (optional; autogenerated if missing, but required for `goto`).
 - `label` – any human‑friendly label.
 - `criteria` – arbitrary value passed to the checker.
-- `when@yes` – what to do when the checker returns `true`.
-- `when@no` – what to do when the checker returns `false`.
+- `when@true` – what to do when the checker returns `true`.
+- `when@false` – what to do when the checker returns `false`.
 - `context` – (optional) extra context to merge when this node is evaluated.
 
-`when@yes` / `when@no` can each be:
+`when@true` / `when@false` can each be:
 
 - another decision node (array),
 - an `end` action,
@@ -502,11 +502,11 @@ YAML variants:
 
 ```yaml
 # Short form: just a boolean result
-when@yes:
+when@true:
   end: true
 
 # Long form: result + extra context
-when@no:
+when@false:
   end:
     result: false
     context:
@@ -520,14 +520,14 @@ Stops the flowchart by throwing an exception.
 Short form:
 
 ```yaml
-when@no:
+when@false:
   error: "Product should never be uncategorized"
 ```
 
 Long form:
 
 ```yaml
-when@no:
+when@false:
   error:
     message: "Custom message"
     exceptionClass: "RuntimeException"      # any RuntimeException subclass
@@ -548,14 +548,14 @@ Jumps to another decision node by id.
 Short form:
 
 ```yaml
-when@yes:
+when@true:
   goto: some_other_node_id
 ```
 
 Long form, with additional context:
 
 ```yaml
-when@yes:
+when@true:
   goto:
     id: some_other_node_id
     context:
@@ -566,7 +566,7 @@ If the target id cannot be found, a `FlowchartRuntimeException` is thrown.
 
 #### Unhandled steps
 
-If a branch (`when@yes` or `when@no`) is missing entirely, that branch is considered **unhandled**. When the runner reaches it, it throws an `UnhandledStepException`, which also exposes the `RunnerState`.
+If a branch (`when@true` or `when@false`) is missing entirely, that branch is considered **unhandled**. When the runner reaches it, it throws an `UnhandledStepException`, which also exposes the `RunnerState`.
 
 This simplifies your YAML definitions, but can lead to unexpected results at runtime if you forget to handle some branches.
 
@@ -598,9 +598,9 @@ entrypoint:
   id: stock_check
   checker: default
   criteria: product.stock > 0
-  when@yes:
+  when@true:
     end: true
-  when@no:
+  when@false:
     end: false
 YAML);
 
@@ -641,7 +641,7 @@ $definition = Yaml::parse(<<<'YAML'
 entrypoint:
   checker: checker.default
   criteria: product.stock > 0
-  when@yes:
+  when@true:
     end: true
 YAML);
 

@@ -13,10 +13,10 @@ use Traversable;
 
 final class RunnerState
 {
-    public private(set) bool $lastResult;
+    public private(set) bool|string|int $lastResult;
 
     /**
-     * @var array{0: string, 1: bool}[]
+     * @var array{0: string, 1: bool|int|string}[]
      */
     public private(set) array $history = [];
 
@@ -52,7 +52,7 @@ final class RunnerState
         return $state;
     }
 
-    public function withLastResult(bool $result, DecisionNode $decisionNode): self
+    public function withLastResult(bool|int|string $result, DecisionNode $decisionNode): self
     {
         $clone = clone $this;
         $clone->lastResult = $result;

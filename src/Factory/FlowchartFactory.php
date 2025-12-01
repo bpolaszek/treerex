@@ -12,6 +12,7 @@ use BenTools\TreeRex\Action\GotoNode;
 use BenTools\TreeRex\Action\RaiseError;
 use BenTools\TreeRex\Action\UnhandledStep;
 use BenTools\TreeRex\Checker\CheckerInterface;
+use BenTools\TreeRex\Definition\Cases;
 use BenTools\TreeRex\Definition\DecisionNode;
 use BenTools\TreeRex\Definition\Flowchart;
 use BenTools\TreeRex\Exception\FlowchartBuildException;
@@ -20,15 +21,22 @@ use Symfony\Component\OptionsResolver\OptionsResolver;
 use Traversable;
 
 use function array_all;
+use function array_diff_key;
 use function array_filter;
 use function array_key_exists;
 use function array_keys;
+use function assert;
 use function BenTools\TreeRex\generate_id;
 use function count;
 use function get_debug_type;
+use function implode;
 use function in_array;
-use function is_bool;
+use function is_array;
 use function is_string;
+use function sprintf;
+use function str_starts_with;
+
+use const ARRAY_FILTER_USE_KEY;
 
 /**
  * @phpstan-import-type DecisionNodeDefinition from FlowchartFactoryInterface
@@ -36,16 +44,15 @@ use function is_string;
  * @phpstan-import-type ErrorDefinition from FlowchartFactoryInterface
  * @phpstan-import-type GotoDefinition from FlowchartFactoryInterface
  */
-final class FlowchartFactory implements FlowchartFactoryInterface
+final readonly class FlowchartFactory implements FlowchartFactoryInterface
 {
     private const array FLOWCHART_ROOT_KEYS = ['entrypoint', 'context'];
     private const array FLOWCHART_DECISION_NODE_KEYS = [
         'checker',
         'id',
         'label',
+        'cases',
         'criteria',
-        'when@no',
-        'when@yes',
         'context',
         'end',
         'goto',
@@ -67,19 +74,16 @@ final class FlowchartFactory implements FlowchartFactoryInterface
         $this->decisionNodeResolver->setAllowedTypes('checker', ['string', 'null', CheckerInterface::class]);
         $this->decisionNodeResolver->setAllowedTypes('id', ['string', 'null']);
         $this->decisionNodeResolver->setAllowedTypes('label', ['string', 'null']);
-        $this->decisionNodeResolver->setAllowedTypes('when@yes', ['array', 'bool']);
-        $this->decisionNodeResolver->setAllowedTypes('when@no', ['array', 'bool']);
+        $this->decisionNodeResolver->setAllowedTypes('cases', ['(bool|int|string)[]', 'null']);
         $this->decisionNodeResolver->setAllowedTypes('end', ['bool', 'array']);
         $this->decisionNodeResolver->setAllowedTypes('error', ['string', 'array']);
         $this->decisionNodeResolver->setAllowedTypes('goto', ['string', 'array']);
-        $this->decisionNodeResolver->setAllowedValues('when@yes', self::validateNode(...));
-        $this->decisionNodeResolver->setAllowedValues('when@no', self::validateNode(...));
         $this->decisionNodeResolver->setAllowedValues('end', self::validateEnd(...));
         $this->decisionNodeResolver->setAllowedValues('error', self::validateError(...));
         $this->decisionNodeResolver->setAllowedValues('goto', self::validateGoto(...));
     }
 
-    public function create(array $flowchartDefinition, bool $allowUnhandledSteps = true): Flowchart
+    public function create(array $flowchartDefinition, bool $allowUnhandledCases = true): Flowchart
     {
         $flowchartDefinition = $this->flowchartResolver->resolve($flowchartDefinition);
 
@@ -87,8 +91,8 @@ final class FlowchartFactory implements FlowchartFactoryInterface
         $entrypoint = $this->buildStep($flowchartDefinition['entrypoint']);
         assert($entrypoint instanceof DecisionNode);
 
-        if (!$allowUnhandledSteps) {
-            $this->checkDecisionNode($entrypoint);
+        if (!$allowUnhandledCases) {
+            $this->ensureNoUnhandledCases($entrypoint);
         }
 
         return new Flowchart($context, $entrypoint);
@@ -99,49 +103,67 @@ final class FlowchartFactory implements FlowchartFactoryInterface
      */
     private function buildDecisionNode(array $data): DecisionNode
     {
-        return new DecisionNode(
+        $cases = $data['cases'] ?? [true, false];
+
+        $decisionNode = new DecisionNode(
             checkerServiceId: $data['checker'],
             id: $data['id'] ?? generate_id(),
+            cases: new Cases($cases),
             label: $data['label'] ?? null,
             criteria: $data['criteria'] ?? null,
-            whenYes: $this->buildStep($data['when@yes'] ?? null),
-            whenNo: $this->buildStep($data['when@no'] ?? null),
             context: $this->toContext($data['context'] ?? []),
         );
+
+        foreach ($cases as $case) {
+            $key = sprintf('when@%s', Cases::stringify($case));
+            $next = $data[$key] ?? null;
+            if (null !== $next) {
+                self::validateNode($next); // @phpstan-ignore argument.type
+            }
+            $decisionNode->cases->when($decisionNode->id, $case, $this->buildStep($next)); // @phpstan-ignore argument.type
+        }
+
+        return $decisionNode;
     }
 
-    private function checkDecisionNode(DecisionNode $decisionNode): void
+    private function ensureNoUnhandledCases(DecisionNode $decisionNode): void
     {
-        match (true) {
-            $decisionNode->whenYes instanceof UnhandledStep => throw new FlowchartBuildException("Step `when@yes` is not defined at step `{$decisionNode->id}`."),
-            $decisionNode->whenNo instanceof UnhandledStep => throw new FlowchartBuildException("Step `when@no` is not defined at step `{$decisionNode->id}`."),
-            $decisionNode->whenYes instanceof DecisionNode => $this->checkDecisionNode($decisionNode->whenYes),
-            $decisionNode->whenNo instanceof DecisionNode => $this->checkDecisionNode($decisionNode->whenNo),
-            default => null,
-        };
+        $unhandledCases = $decisionNode->cases->getUnHandledCases();
+        if ($unhandledCases) {
+            throw new FlowchartBuildException(sprintf('Cases `%s` are not handled at step `%s`.', implode(', ', $unhandledCases), $decisionNode->id));
+        }
+        foreach ($decisionNode->cases as $step) {
+            if ($step instanceof DecisionNode) {
+                $this->ensureNoUnhandledCases($step);
+            }
+        }
     }
 
     /**
      * @param bool|DecisionNodeDefinition|null $data
      */
-    private function buildStep(bool|array|null $data): Action|DecisionNode
+    private function buildStep(bool|int|string|array|null $data): Action|DecisionNode
     {
         if (null === $data) {
             return new UnhandledStep();
         }
 
-        if (is_bool($data)) {
+        if (!is_array($data)) {
             return new EndFlow($data);
         }
 
+        $exceptCases = array_filter($data, fn ($key) => !str_starts_with($key, 'when@'), ARRAY_FILTER_USE_KEY);
+        $withCases = array_diff_key($data, $exceptCases);
+
         /** @var DecisionNodeDefinition $data */
-        $data = $this->decisionNodeResolver->resolve($data);
+        $exceptCases = $this->decisionNodeResolver->resolve($exceptCases);
+        $data = [...$exceptCases, ...$withCases];
 
         return match (true) {
             array_key_exists('end', $data) => $this->normalizeEnd($data['end']),
             array_key_exists('error', $data) => new RaiseError(...(array) $data['error']),
             array_key_exists('goto', $data) => new GotoNode(...(array) $data['goto']),
-            default => $this->buildDecisionNode($data),
+            default => $this->buildDecisionNode($data), // @phpstan-ignore argument.type
         };
     }
 
@@ -160,18 +182,18 @@ final class FlowchartFactory implements FlowchartFactoryInterface
      */
     private function normalizeEnd(bool|array $data): EndFlow
     {
-        return match (is_bool($data)) {
-            true => new EndFlow($data),
-            false => new EndFlow($data['result'] ?? null, $this->toContext($data['context'] ?? [])),
+        return match (is_array($data)) {
+            true => new EndFlow($data['result'] ?? null, $this->toContext($data['context'] ?? [])),
+            false => new EndFlow($data),
         };
     }
 
     /**
      * @param DecisionNodeDefinition $node
      */
-    private static function validateNode(array|bool $node): bool
+    private static function validateNode(bool|int|string|array $node): bool
     {
-        if (is_bool($node)) {
+        if (!is_array($node)) {
             return true;
         }
 
@@ -190,9 +212,9 @@ final class FlowchartFactory implements FlowchartFactoryInterface
     /**
      * @param bool|EndDefinition $end
      */
-    private static function validateEnd(bool|array $end): bool
+    private static function validateEnd(bool|int|string|array $end): bool
     {
-        if (is_bool($end)) {
+        if (!is_array($end)) {
             return true;
         }
 

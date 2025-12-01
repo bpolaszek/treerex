@@ -29,13 +29,13 @@ describe('Flowchart Factory', function () {
                 'checker' => 'some.checker.service',
                 'id' => 'root',
                 'label' => 'Root node',
-                'when@no' => ['end' => $end],
-                'when@yes' => [
+                'when@false' => ['end' => $end],
+                'when@true' => [
                     'checker' => 'some.other.checker.service',
-                    'when@yes' => ['goto' => $goto],
-                    'when@no' => [
+                    'when@true' => ['goto' => $goto],
+                    'when@false' => [
                         'checker' => 'yet.another.checker.service',
-                        'when@no' => ['error' => $error],
+                        'when@false' => ['error' => $error],
                     ],
                 ],
             ],
@@ -45,17 +45,17 @@ describe('Flowchart Factory', function () {
             ->and($flowchart->entrypoint->checkerServiceId)->toBe('some.checker.service')
             ->and($flowchart->entrypoint->id)->toBe('root')
             ->and($flowchart->entrypoint->label)->toBe('Root node')
-            ->and($flowchart->entrypoint->whenNo)->toBeInstanceOf(EndFlow::class)
-            ->and($flowchart->entrypoint->whenNo->result)->toBeFalse()
-            ->and($flowchart->entrypoint->whenYes)->toBeInstanceOf(DecisionNode::class)
-            ->and($flowchart->entrypoint->whenYes->checkerServiceId)->toBe('some.other.checker.service')
-            ->and($flowchart->entrypoint->whenYes->whenYes)->toBeInstanceOf(GotoNode::class)
-            ->and($flowchart->entrypoint->whenYes->whenYes->id)->toBe('root')
-            ->and($flowchart->entrypoint->whenYes->whenNo)->toBeInstanceOf(DecisionNode::class)
-            ->and($flowchart->entrypoint->whenYes->whenNo->checkerServiceId)->toBe('yet.another.checker.service')
-            ->and($flowchart->entrypoint->whenYes->whenNo->whenNo)->toBeInstanceOf(RaiseError::class)
-            ->and($flowchart->entrypoint->whenYes->whenNo->whenNo->message)->toBe('Ooops')
-            ->and($flowchart->entrypoint->whenYes->whenNo->whenYes)->toBeInstanceOf(UnhandledStep::class);
+            ->and($flowchart->entrypoint->cases->get(false))->toBeInstanceOf(EndFlow::class)
+            ->and($flowchart->entrypoint->cases->get(false)->result)->toBeFalse()
+            ->and($flowchart->entrypoint->cases->get(true))->toBeInstanceOf(DecisionNode::class)
+            ->and($flowchart->entrypoint->cases->get(true)->checkerServiceId)->toBe('some.other.checker.service')
+            ->and($flowchart->entrypoint->cases->get(true)->cases->get(true))->toBeInstanceOf(GotoNode::class)
+            ->and($flowchart->entrypoint->cases->get(true)->cases->get(true)->id)->toBe('root')
+            ->and($flowchart->entrypoint->cases->get(true)->cases->get(false))->toBeInstanceOf(DecisionNode::class)
+            ->and($flowchart->entrypoint->cases->get(true)->cases->get(false)->checkerServiceId)->toBe('yet.another.checker.service')
+            ->and($flowchart->entrypoint->cases->get(true)->cases->get(false)->cases->get(false))->toBeInstanceOf(RaiseError::class)
+            ->and($flowchart->entrypoint->cases->get(true)->cases->get(false)->cases->get(false)->message)->toBe('Ooops')
+            ->and($flowchart->entrypoint->cases->get(true)->cases->get(false)->cases->get(true))->toBeInstanceOf(UnhandledStep::class);
     })->with(function () {
         $dataset = [
             'end' => [
@@ -103,18 +103,18 @@ describe('Flowchart Factory', function () {
                 'checker' => 'some.checker.service',
                 'id' => 'root',
                 'label' => 'Root node',
-                'when@no' => ['end' => false],
-                'when@yes' => [
+                'when@false' => ['end' => false],
+                'when@true' => [
                     'checker' => 'some.other.checker.service',
-                    'when@yes' => ['goto' => 'root'],
-                    'when@no' => [
+                    'when@true' => ['goto' => 'root'],
+                    'when@false' => [
                         'checker' => 'yet.another.checker.service',
-                        'when@no' => ['error' => 'Ooops'],
+                        'when@false' => ['error' => 'Ooops'],
                     ],
                 ],
             ],
         ];
-        expect(fn () => $factory->create($flowchartDefinition, allowUnhandledSteps: false))
+        expect(fn () => $factory->create($flowchartDefinition, allowUnhandledCases: false))
             ->toThrow(FlowchartBuildException::class);
     });
 });
@@ -126,8 +126,8 @@ describe('Flowchart Factory Validation', function () {
         $definition = [
             'entrypoint' => [
                 'checker' => 'checker.default',
-                'when@yes' => ['end' => true, 'goto' => 'root'],
-                'when@no' => ['end' => false],
+                'when@true' => ['end' => true, 'goto' => 'root'],
+                'when@false' => ['end' => false],
             ],
         ];
 
@@ -140,9 +140,9 @@ describe('Flowchart Factory Validation', function () {
         ];
 
         $invalidCases = [
-            ['when@yes' => ['end' => ['foo' => 'bar']]], // <-- Invalid keys in end definition
-            ['when@yes' => ['end' => ['result' => 'nope']]], // <-- Invalid type for end[result]
-            ['when@yes' => ['end' => ['context' => 'nope']]], // <-- Invalid type for end[context]
+            ['when@true' => ['end' => ['foo' => 'bar']]], // <-- Invalid keys in end definition
+            ['when@true' => ['end' => ['result' => 'nope']]], // <-- Invalid type for end[result]
+            ['when@true' => ['end' => ['context' => 'nope']]], // <-- Invalid type for end[context]
         ];
 
         foreach ($invalidCases as $invalidCase) {
@@ -156,14 +156,14 @@ describe('Flowchart Factory Validation', function () {
     it('denies invalid `error` structure and types', function () use ($factory) {
         $decisionNode = [
             'checker' => 'checker.default',
-            'when@no' => ['end' => false],
+            'when@false' => ['end' => false],
         ];
 
         $invalidCases = [
-            ['when@yes' => ['error' => ['foo' => 'bar']]], // <-- Invalid keys
-            ['when@yes' => ['error' => ['message' => false]]], // <-- Invalid message type
-            ['when@yes' => ['error' => ['exceptionClass' => false]]], // <-- Invalid exceptionClass type
-            ['when@yes' => ['error' => ['context' => 'nope']]], // <-- Invalid context type
+            ['when@true' => ['error' => ['foo' => 'bar']]], // <-- Invalid keys
+            ['when@true' => ['error' => ['message' => false]]], // <-- Invalid message type
+            ['when@true' => ['error' => ['exceptionClass' => false]]], // <-- Invalid exceptionClass type
+            ['when@true' => ['error' => ['context' => 'nope']]], // <-- Invalid context type
         ];
 
         foreach ($invalidCases as $invalidCase) {
@@ -177,13 +177,13 @@ describe('Flowchart Factory Validation', function () {
     it('denies invalid `goto` structure and types', function () use ($factory) {
         $decisionNode = [
             'checker' => 'checker.default',
-            'when@no' => ['end' => false],
+            'when@false' => ['end' => false],
         ];
 
         $invalidCases = [
-            ['when@yes' => ['goto' => ['foo' => 'bar']]], // <-- Invalid keys
-            ['when@yes' => ['goto' => ['id' => 123]]], // <-- Invalid id type
-            ['when@yes' => ['goto' => ['id' => 'root', 'context' => 'nope']]], // <-- Invalid context type
+            ['when@true' => ['goto' => ['foo' => 'bar']]], // <-- Invalid keys
+            ['when@true' => ['goto' => ['id' => 123]]], // <-- Invalid id type
+            ['when@true' => ['goto' => ['id' => 'root', 'context' => 'nope']]], // <-- Invalid context type
         ];
 
         foreach ($invalidCases as $invalidCase) {
@@ -198,13 +198,13 @@ describe('Flowchart Factory Validation', function () {
         $definition = [
             'entrypoint' => [
                 'checker' => 'checker.default',
-                'when@yes' => ['end' => true],
-                'when@no' => ['error' => 'Oops'],
+                'when@true' => ['end' => true],
+                'when@false' => ['error' => 'Oops'],
             ],
         ];
 
         // Should not throw since both branches are actions (no unhandled steps)
-        $factory->create($definition, allowUnhandledSteps: false);
+        $factory->create($definition, allowUnhandledCases: false);
 
         expect(true)->toBeTrue();
     });
@@ -213,17 +213,17 @@ describe('Flowchart Factory Validation', function () {
         $definition = [
             'entrypoint' => [
                 'checker' => 'checker.default',
-                'when@yes' => true,
-                'when@no' => false,
+                'when@true' => true,
+                'when@false' => false,
             ],
         ];
 
         $flowchart = $factory->create($definition);
 
-        expect($flowchart->entrypoint->whenYes)->toBeInstanceOf(EndFlow::class)
-            ->and($flowchart->entrypoint->whenYes)->toEqual(new EndFlow(true))
-            ->and($flowchart->entrypoint->whenNo)->toBeInstanceOf(EndFlow::class)
-            ->and($flowchart->entrypoint->whenNo)->toEqual(new EndFlow(false))
+        expect($flowchart->entrypoint->cases->get(true))->toBeInstanceOf(EndFlow::class)
+            ->and($flowchart->entrypoint->cases->get(true))->toEqual(new EndFlow(true))
+            ->and($flowchart->entrypoint->cases->get(false))->toBeInstanceOf(EndFlow::class)
+            ->and($flowchart->entrypoint->cases->get(false))->toEqual(new EndFlow(false))
         ;
     });
 });

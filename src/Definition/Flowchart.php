@@ -38,11 +38,10 @@ final readonly class Flowchart
     private static function register(DecisionNode $node, ArrayObject $decisionNodes = new ArrayObject()): ArrayObject
     {
         $decisionNodes[] = $node;
-        if ($node->whenYes instanceof DecisionNode) {
-            self::register($node->whenYes, $decisionNodes);
-        }
-        if ($node->whenNo instanceof DecisionNode) {
-            self::register($node->whenNo, $decisionNodes);
+        foreach ($node->cases as $case) {
+            if ($case instanceof DecisionNode) {
+                self::register($case, $decisionNodes);
+            }
         }
 
         return $decisionNodes;
