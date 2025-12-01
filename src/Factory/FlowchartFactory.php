@@ -23,8 +23,10 @@ use Traversable;
 use function array_all;
 use function array_diff_key;
 use function array_filter;
+use function array_find;
 use function array_key_exists;
 use function array_keys;
+use function array_walk;
 use function assert;
 use function BenTools\TreeRex\generate_id;
 use function count;
@@ -40,13 +42,14 @@ use const ARRAY_FILTER_USE_KEY;
 
 /**
  * @phpstan-import-type DecisionNodeDefinition from FlowchartFactoryInterface
+ * @phpstan-import-type ReusableBlockDefinition from FlowchartFactoryInterface
  * @phpstan-import-type EndDefinition from FlowchartFactoryInterface
  * @phpstan-import-type ErrorDefinition from FlowchartFactoryInterface
  * @phpstan-import-type GotoDefinition from FlowchartFactoryInterface
  */
 final readonly class FlowchartFactory implements FlowchartFactoryInterface
 {
-    private const array FLOWCHART_ROOT_KEYS = ['entrypoint', 'context'];
+    private const array FLOWCHART_ROOT_KEYS = ['entrypoint', 'context', 'blocks'];
     private const array FLOWCHART_DECISION_NODE_KEYS = [
         'checker',
         'id',
@@ -57,6 +60,7 @@ final readonly class FlowchartFactory implements FlowchartFactoryInterface
         'end',
         'goto',
         'error',
+        'use',
     ];
     private const array FLOWCHART_ACTIONS = ['end', 'goto', 'error'];
     private OptionsResolver $flowchartResolver;
@@ -74,6 +78,7 @@ final readonly class FlowchartFactory implements FlowchartFactoryInterface
         $this->decisionNodeResolver->setAllowedTypes('checker', ['string', 'null', CheckerInterface::class]);
         $this->decisionNodeResolver->setAllowedTypes('id', ['string', 'null']);
         $this->decisionNodeResolver->setAllowedTypes('label', ['string', 'null']);
+        $this->decisionNodeResolver->setAllowedTypes('use', ['string', 'null']);
         $this->decisionNodeResolver->setAllowedTypes('cases', ['(bool|int|string)[]', 'null']);
         $this->decisionNodeResolver->setAllowedTypes('end', ['bool', 'array']);
         $this->decisionNodeResolver->setAllowedTypes('error', ['string', 'array']);
@@ -87,8 +92,12 @@ final readonly class FlowchartFactory implements FlowchartFactoryInterface
     {
         $flowchartDefinition = $this->flowchartResolver->resolve($flowchartDefinition);
 
-        $context = $this->toContext($flowchartDefinition['context'] ?? []);
-        $entrypoint = $this->buildStep($flowchartDefinition['entrypoint']);
+        $context = self::toContext($flowchartDefinition['context'] ?? []);
+        $blocks = $flowchartDefinition['blocks'] ?? [];
+
+        // Ensure all blocks have an ID, or take the key as ID.
+        array_walk($blocks, fn (array &$block, int|string $key) => $block['id'] ??= (string) $key);
+        $entrypoint = $this->buildStep($flowchartDefinition['entrypoint'], $blocks);
         assert($entrypoint instanceof DecisionNode);
 
         if (!$allowUnhandledCases) {
@@ -99,9 +108,48 @@ final readonly class FlowchartFactory implements FlowchartFactoryInterface
     }
 
     /**
-     * @param DecisionNodeDefinition $data
+     * @param bool|DecisionNodeDefinition|null $data
+     * @param ReusableBlockDefinition[]        $blocks
      */
-    private function buildDecisionNode(array $data): DecisionNode
+    private function buildStep(bool|int|string|array|null $data, array $blocks): Action|DecisionNode
+    {
+        if (null === $data) {
+            return new UnhandledStep();
+        }
+
+        if (!is_array($data)) {
+            return new EndFlow($data);
+        }
+
+        if (isset($data['use'])) {
+            $block = array_find($blocks, fn (array $block) => $block['id'] === $data['use'])
+                ?? throw new FlowchartBuildException(sprintf('Block `%s` not found.', $data['use']));
+            // @codeCoverageIgnoreStart
+            $data = [...$block, ...$data];
+            // @codeCoverageIgnoreEnd
+            // That's actually covered, but Xdebug somehow doesn't detect it 😢
+        }
+
+        $exceptCases = array_filter($data, fn ($key) => !str_starts_with($key, 'when@'), ARRAY_FILTER_USE_KEY);
+        $onlyCases = array_diff_key($data, $exceptCases);
+
+        /** @var DecisionNodeDefinition $data */
+        $exceptCases = $this->decisionNodeResolver->resolve($exceptCases);
+        $data = [...$exceptCases, ...$onlyCases];
+
+        return match (true) {
+            array_key_exists('end', $data) => self::normalizeEnd($data['end']),
+            array_key_exists('error', $data) => new RaiseError(...(array) $data['error']),
+            array_key_exists('goto', $data) => new GotoNode(...(array) $data['goto']),
+            default => $this->buildDecisionNode($data, $blocks), // @phpstan-ignore argument.type
+        };
+    }
+
+    /**
+     * @param DecisionNodeDefinition    $data
+     * @param ReusableBlockDefinition[] $blocks
+     */
+    private function buildDecisionNode(array $data, array $blocks): DecisionNode
     {
         $cases = $data['cases'] ?? [true, false];
 
@@ -111,7 +159,7 @@ final readonly class FlowchartFactory implements FlowchartFactoryInterface
             cases: new Cases($cases),
             label: $data['label'] ?? null,
             criteria: $data['criteria'] ?? null,
-            context: $this->toContext($data['context'] ?? []),
+            context: self::toContext($data['context'] ?? []),
         );
 
         foreach ($cases as $case) {
@@ -120,7 +168,7 @@ final readonly class FlowchartFactory implements FlowchartFactoryInterface
             if (null !== $next) {
                 self::validateNode($next); // @phpstan-ignore argument.type
             }
-            $decisionNode->cases->when($decisionNode->id, $case, $this->buildStep($next)); // @phpstan-ignore argument.type
+            $decisionNode->cases->when($decisionNode->id, $case, $this->buildStep($next, $blocks)); // @phpstan-ignore argument.type
         }
 
         return $decisionNode;
@@ -140,39 +188,11 @@ final readonly class FlowchartFactory implements FlowchartFactoryInterface
     }
 
     /**
-     * @param bool|DecisionNodeDefinition|null $data
-     */
-    private function buildStep(bool|int|string|array|null $data): Action|DecisionNode
-    {
-        if (null === $data) {
-            return new UnhandledStep();
-        }
-
-        if (!is_array($data)) {
-            return new EndFlow($data);
-        }
-
-        $exceptCases = array_filter($data, fn ($key) => !str_starts_with($key, 'when@'), ARRAY_FILTER_USE_KEY);
-        $withCases = array_diff_key($data, $exceptCases);
-
-        /** @var DecisionNodeDefinition $data */
-        $exceptCases = $this->decisionNodeResolver->resolve($exceptCases);
-        $data = [...$exceptCases, ...$withCases];
-
-        return match (true) {
-            array_key_exists('end', $data) => $this->normalizeEnd($data['end']),
-            array_key_exists('error', $data) => new RaiseError(...(array) $data['error']),
-            array_key_exists('goto', $data) => new GotoNode(...(array) $data['goto']),
-            default => $this->buildDecisionNode($data), // @phpstan-ignore argument.type
-        };
-    }
-
-    /**
      * @param array<string,mixed> $values
      *
      * @return ArrayAccess<string, mixed>&Traversable<string, mixed>
      */
-    private function toContext(array $values): ArrayAccess&Traversable
+    private static function toContext(array $values): ArrayAccess&Traversable
     {
         return new ArrayObject($values);
     }
@@ -180,21 +200,21 @@ final readonly class FlowchartFactory implements FlowchartFactoryInterface
     /**
      * @param bool|EndDefinition $data
      */
-    private function normalizeEnd(bool|array $data): EndFlow
+    private static function normalizeEnd(bool|array $data): EndFlow
     {
         return match (is_array($data)) {
-            true => new EndFlow($data['result'] ?? null, $this->toContext($data['context'] ?? [])),
+            true => new EndFlow($data['result'] ?? null, self::toContext($data['context'] ?? [])),
             false => new EndFlow($data),
         };
     }
 
     /**
-     * @param DecisionNodeDefinition $node
+     * @param bool|int|string|DecisionNodeDefinition $node
      */
-    private static function validateNode(bool|int|string|array $node): bool
+    private static function validateNode(bool|int|string|array $node): void
     {
         if (!is_array($node)) {
-            return true;
+            return;
         }
 
         $actions = array_filter(
@@ -205,12 +225,10 @@ final readonly class FlowchartFactory implements FlowchartFactoryInterface
         if (count($actions) > 1) {
             throw new InvalidOptionsException('Cannot have several actions wihin 1 node.');
         }
-
-        return true;
     }
 
     /**
-     * @param bool|EndDefinition $end
+     * @param bool|int|string|EndDefinition $end
      */
     private static function validateEnd(bool|int|string|array $end): bool
     {

@@ -9,7 +9,7 @@ use Psr\Container\ContainerInterface;
 use Psr\Container\NotFoundExceptionInterface;
 
 /**
- * @internal
+ * @internal - Use your framework's service container instead
  *
  * @template T of object
  */
@@ -28,7 +28,7 @@ final readonly class ServiceLocator implements ContainerInterface
      *
      * @return T
      */
-    public function get(string $id)
+    public function get(string $id): object
     {
         return match ($this->has($id)) {
             true => $this->services[$id],

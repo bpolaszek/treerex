@@ -12,6 +12,7 @@ use BenTools\TreeRex\Definition\DecisionNode;
 use BenTools\TreeRex\Exception\FlowchartBuildException;
 use BenTools\TreeRex\Factory\FlowchartFactory;
 use Symfony\Component\OptionsResolver\Exception\InvalidOptionsException;
+use Symfony\Component\Yaml\Yaml;
 
 use function BenTools\CartesianProduct\combinations;
 use function describe;
@@ -225,5 +226,15 @@ describe('Flowchart Factory Validation', function () {
             ->and($flowchart->entrypoint->cases->get(false))->toBeInstanceOf(EndFlow::class)
             ->and($flowchart->entrypoint->cases->get(false))->toEqual(new EndFlow(false))
         ;
+    });
+
+    it('complains when trying to use a node that does not exist', function () {
+        $content = <<<YAML
+entrypoint:
+    use: unknown_node
+YAML;
+
+        expect(fn () => new FlowchartFactory()->create(Yaml::parse($content)))
+            ->toThrow(FlowchartBuildException::class, 'Block `unknown_node` not found.');
     });
 });

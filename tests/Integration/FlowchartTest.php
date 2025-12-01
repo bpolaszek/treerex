@@ -51,20 +51,24 @@ entrypoint:
             when@true:
                 goto: category_check
         when@false:
-            id: category_check
-            label: Ensure product is categorized 
+            use: category_check # <-- Demonstrates reusable blocks ✨
+
+
+blocks:
+    category_check:
+        label: Ensure product is categorized 
+        checker: default
+        criteria: product.categorized
+        when@false:
+            error: Product should never be uncategorized
+        when@true:
+            id: expiration_check
+            label: Ensure product is not expired 
             checker: default
-            criteria: product.categorized
-            when@false:
-                error: Product should never be uncategorized
+            criteria: "!product.expired"
             when@true:
-                id: expiration_check
-                label: Ensure product is not expired 
-                checker: default
-                criteria: "!product.expired"
-                when@true:
-                    end: true
-                #when@false # <-- this step has not been configured 😬
+                end: true
+            #when@false # <-- this step has not been configured 😬
 YAML;
 
 describe('Flowchart Runner Test', function () use ($definition) {
