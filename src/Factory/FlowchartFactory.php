@@ -104,6 +104,7 @@ final readonly class FlowchartFactory implements FlowchartFactoryInterface
         }
 
         $context = self::toContext($flowchartDefinition['context'] ?? []);
+
         return new Flowchart($context, $entrypoint);
     }
 
