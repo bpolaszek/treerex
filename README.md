@@ -42,22 +42,7 @@ flowchart TD
     D -- true --> F[[Salable: false]]
 ```
 
-### 1. Bring your domain model
-
-```php
-namespace App\Domain;
-
-final class Product
-{
-    public function __construct(
-        public int $stock,
-        public bool $blacklisted,
-    ) {
-    }
-}
-```
-
-### 2. Implement a checker
+### 1. Implement a checker
 
 A checker receives the **subject**, some **criteria** (opaque to the runner), and the **context**, then returns a boolean.
 
@@ -90,7 +75,7 @@ final class ProductChecker implements CheckerInterface
 }
 ```
 
-### 3. Write the YAML flowchart
+### 2. Write the YAML flowchart
 
 Create a file, for instance `config/flowcharts/product_is_salable.yaml`:
 
@@ -129,7 +114,7 @@ entrypoint:
           reason: "OK"
 ```
 
-### 4. Instantiate and run the flowchart
+### 3. Instantiate and run the flowchart
 
 ```php
 use ArrayObject;
@@ -141,24 +126,20 @@ use BenTools\TreeRex\Utils\ServiceLocator;
 
 require_once __DIR__.'/vendor/autoload.php';
 
+$file = __DIR__.'/config/flowcharts/product_is_salable.yaml';
+
 // 1. Build the Flowchart from YAML
-$yamlFactory = new FlowchartYamlFactory();
-$flowchart = $yamlFactory->parseYamlFile(
-    __DIR__.'/config/flowcharts/product_is_salable.yaml',
-);
+$flowchart = new FlowchartYamlFactory()->parseYamlFile($file);
 
 // 2. Register your checker in a PSR‑11 container (here: simple ServiceLocator, but use your framework's DI container instead)
-$container = new ServiceLocator([
-    'app.checker.product' => new ProductChecker(),
-]);
+$container = new ServiceLocator(['app.checker.product' => new ProductChecker()]);
 
 // 3. Create the runner
 $runner = new FlowchartRunner($container);
 
 // 4. Prepare subject and context
 $product = new Product(stock: 10, blacklisted: false);
-$context = new ArrayObject([
-    // You can put anything you want here.
+$context = new ArrayObject([ // You can put anything you want here.
     'requested_by' => 'Alice',
 ]);
 
@@ -172,7 +153,8 @@ var_dump($context['_state']);  // A `RunnerState` object giving you the full his
 
 ## Retrieving the flowchart state
 
-The runner keeps track of its internal **state** in a `RunnerState` object. This state is always available under the special `_state` key in the **context**.
+The runner keeps track of its internal **state** in a `RunnerState` object. 
+This state is always available under the special `_state` key in the **context**.
 
 ```php
 use BenTools\TreeRex\Runner\RunnerState;
@@ -425,14 +407,14 @@ YAML);
 $factory = new FlowchartFactory();
 $flowchart = $factory->create($definition);
 
-$container = new ServiceLocator([
+$container = new ServiceLocator([ // <-- Ideally, this is your framework's DI container.
     'flowchart.product_is_salable' => $flowchart,
     'checker.default' => new ExpressionLanguageChecker('product'),
 ]);
 
-$runner = new FlowchartRunner($container); // <-- Ideally, this is your framework's DI container.
+$runner = new FlowchartRunner($container);
 
-// Here we pass the flowchart *id* instead of the Flowchart instance
+// Here we pass the flowchart *id* instead of the Flowchart *instance*
 $result = $runner->satisfies($product, 'flowchart.product_is_salable');
 ```
 
