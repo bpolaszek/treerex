@@ -9,10 +9,19 @@ use BenTools\TreeRex\Exception\FlowchartBuildException;
 
 /**
  * @phpstan-type Context array<string, mixed>
+ * @phpstan-type ReusableBlockDefinition array{
+ *     id: string,
+ *     checker?: string,
+ *     label?: string,
+ *     end?: EndDefinition|bool,
+ *     error?: ErrorDefinition|string,
+ *     goto?: GotoDefinition|string,
+ * }
  * @phpstan-type DecisionNodeDefinition array{
  *     checker: string,
  *     id?: string,
  *     label?: string,
+ *     use?: string,
  *     end?: EndDefinition|bool,
  *     error?: ErrorDefinition|string,
  *     goto?: GotoDefinition|string,
@@ -32,6 +41,7 @@ use BenTools\TreeRex\Exception\FlowchartBuildException;
  * }
  * @phpstan-type FlowchartDefinition array{
  *     entrypoint: DecisionNodeDefinition,
+ *     nodes: DecisionNodeDefinition[],
  *     context?: Context,
  * }
  */
