@@ -64,7 +64,7 @@ final readonly class FlowchartFactory implements FlowchartFactoryInterface
             FlowchartDefinitionHelper::ensureNoUnhandledCases($entrypoint);
         }
 
-        $context = FlowchartDefinitionHelper::toContext($flowchartDefinition['context'] ?? []);
+        $context = $flowchartDefinition['context'] ?? [];
 
         return new Flowchart($context, $entrypoint);
     }
@@ -126,7 +126,7 @@ final readonly class FlowchartFactory implements FlowchartFactoryInterface
             cases: new Cases($cases),
             label: $data['label'] ?? null,
             criteria: $data['criteria'] ?? null,
-            context: FlowchartDefinitionHelper::toContext($data['context'] ?? []),
+            context: $data['context'] ?? [],
         );
 
         foreach ($cases as $case) {

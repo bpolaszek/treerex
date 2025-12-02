@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace BenTools\TreeRex\Definition;
 
 use BenTools\TreeRex\Action\Action;
-use BenTools\TreeRex\Runner\RunnerContext;
 
 /**
  * @internal
@@ -13,7 +12,7 @@ use BenTools\TreeRex\Runner\RunnerContext;
 final readonly class DecisionNode
 {
     /**
-     * @param RunnerContext<string, mixed> $context
+     * @param array<string, mixed> $context
      */
     public function __construct(
         public string $checkerServiceId,
@@ -21,7 +20,7 @@ final readonly class DecisionNode
         public Cases $cases,
         public ?string $label = null,
         public mixed $criteria = null,
-        public RunnerContext $context = new RunnerContext(),
+        public array $context = [],
     ) {
     }
 

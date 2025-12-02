@@ -4,9 +4,7 @@ declare(strict_types=1);
 
 namespace BenTools\TreeRex\Definition;
 
-use ArrayAccess;
 use ArrayObject;
-use Traversable;
 
 final readonly class Flowchart
 {
@@ -16,10 +14,10 @@ final readonly class Flowchart
     private array $decisionNodes;
 
     /**
-     * @param ArrayAccess<string, mixed>&Traversable<string, mixed> $context
+     * @param array<string, mixed> $context
      */
     public function __construct(
-        public ArrayAccess&Traversable $context,
+        public array $context,
         public DecisionNode $entrypoint,
     ) {
         $this->decisionNodes = [...self::register($entrypoint)];

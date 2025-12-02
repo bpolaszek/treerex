@@ -7,7 +7,6 @@ namespace BenTools\TreeRex\Factory;
 use BenTools\TreeRex\Action\EndFlow;
 use BenTools\TreeRex\Definition\DecisionNode;
 use BenTools\TreeRex\Exception\FlowchartBuildException;
-use BenTools\TreeRex\Runner\RunnerContext;
 use Symfony\Component\OptionsResolver\Exception\InvalidOptionsException;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 
@@ -95,7 +94,7 @@ final readonly class FlowchartDefinitionHelper
     public static function normalizeEnd(bool|array $data): EndFlow
     {
         return match (is_array($data)) {
-            true => new EndFlow($data['result'] ?? null, self::toContext($data['context'] ?? [])),
+            true => new EndFlow($data['result'] ?? null, $data['context'] ?? []),
             false => new EndFlow($data),
         };
     }
@@ -196,16 +195,6 @@ final readonly class FlowchartDefinitionHelper
         }
 
         return true;
-    }
-
-    /**
-     * @param array<string,mixed> $values
-     *
-     * @return RunnerContext<string, mixed>
-     */
-    public static function toContext(array $values): RunnerContext
-    {
-        return new RunnerContext($values);
     }
 
     public static function ensureNoUnhandledCases(DecisionNode $decisionNode): void

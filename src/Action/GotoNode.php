@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace BenTools\TreeRex\Action;
 
 use BenTools\TreeRex\Exception\SkippedSteps;
-use BenTools\TreeRex\Runner\RunnerContext;
 use BenTools\TreeRex\Runner\RunnerState;
 
 /**
@@ -14,11 +13,11 @@ use BenTools\TreeRex\Runner\RunnerState;
 final readonly class GotoNode extends Action
 {
     /**
-     * @param RunnerContext<string, mixed> $context
+     * @param array<string, mixed> $context
      */
     public function __construct(
         public string $id,
-        public RunnerContext $context = new RunnerContext(),
+        public array $context = [],
     ) {
     }
 

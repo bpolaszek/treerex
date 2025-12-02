@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace BenTools\TreeRex\Action;
 
-use BenTools\TreeRex\Runner\RunnerContext;
 use BenTools\TreeRex\Runner\RunnerState;
 
 /**
@@ -13,11 +12,11 @@ use BenTools\TreeRex\Runner\RunnerState;
 final readonly class EndFlow extends Action
 {
     /**
-     * @param RunnerContext<string, mixed> $context
+     * @param array<string, mixed> $context
      */
     public function __construct(
         public bool|int|string|null $result,
-        public RunnerContext $context = new RunnerContext(),
+        public array $context = [],
     ) {
     }
 

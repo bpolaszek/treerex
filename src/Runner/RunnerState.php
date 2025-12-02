@@ -4,11 +4,9 @@ declare(strict_types=1);
 
 namespace BenTools\TreeRex\Runner;
 
-use ArrayAccess;
 use BenTools\TreeRex\Checker\CheckerInterface;
 use BenTools\TreeRex\Definition\DecisionNode;
 use BenTools\TreeRex\Definition\Flowchart;
-use Traversable;
 
 final class RunnerState
 {
@@ -61,11 +59,11 @@ final class RunnerState
     }
 
     /**
-     * @param (ArrayAccess<string, mixed>&Traversable<string, mixed>)|array<string, mixed> ...$contexts
+     * @param array<string, mixed> ...$contexts
      *
      * @internal
      */
-    public function withAppendedContext((ArrayAccess&Traversable)|array ...$contexts): self
+    public function withAppendedContext(array ...$contexts): self
     {
         $clone = clone $this;
         foreach ($contexts as $context) {

@@ -9,7 +9,7 @@ use BenTools\TreeRex\Definition\Flowchart;
 interface FlowchartRunnerInterface
 {
     /**
-     * @param (RunnerContext<string, mixed>)|array<string, mixed> $context
+     * @param RunnerContext<string, mixed>|array<string, mixed> $context
      */
     public function satisfies(
         mixed $subject,
