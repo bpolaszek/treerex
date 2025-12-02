@@ -120,6 +120,55 @@ describe('Flowchart Factory', function () {
     });
 });
 
+describe('Flowchart Factory -> Options', function () {
+    $factory = new FlowchartFactory();
+
+    it('spots unhandled steps', function () use ($factory) {
+        $flowchartDefinition = [
+            'options' => ['allowUnhandledCases' => false],
+            'context' => ['foo' => 'bar'],
+            'entrypoint' => [
+                'checker' => 'some.checker.service',
+                'id' => 'root',
+                'label' => 'Root node',
+                'when@false' => ['end' => false],
+                'when@true' => [
+                    'checker' => 'some.other.checker.service',
+                    'when@true' => ['goto' => 'root'],
+                    'when@false' => [
+                        'checker' => 'yet.another.checker.service',
+                        'when@false' => ['error' => 'Ooops'],
+                    ],
+                ],
+            ],
+        ];
+        expect(fn () => $factory->create($flowchartDefinition))
+            ->toThrow(FlowchartBuildException::class);
+    });
+
+    it('accepts a default checker service', function () use ($factory) {
+        $flowchartDefinition = [
+            'options' => ['defaultChecker' => 'default.checker.service'],
+            'context' => ['foo' => 'bar'],
+            'entrypoint' => [
+                'id' => 'root',
+                'label' => 'Root node',
+                'when@false' => [
+                    'when@true' => ['end' => false],
+                ],
+                'when@true' => [
+                    'checker' => 'some.checker.service',
+                ],
+            ],
+        ];
+
+        $flowchart = $factory->create($flowchartDefinition);
+        expect($flowchart->entrypoint->checkerServiceId)->toBe('default.checker.service')
+            ->and($flowchart->entrypoint->when(true)->checkerServiceId)->toBe('some.checker.service')
+            ->and($flowchart->entrypoint->when(false)->checkerServiceId)->toBe('default.checker.service');
+    });
+});
+
 describe('Flowchart Factory Validation', function () {
     $factory = new FlowchartFactory();
 

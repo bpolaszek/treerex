@@ -6,6 +6,7 @@ namespace BenTools\TreeRex\Definition;
 
 use ArrayAccess;
 use ArrayObject;
+use BenTools\TreeRex\Action\Action;
 use Traversable;
 
 /**
@@ -24,5 +25,10 @@ final readonly class DecisionNode
         public mixed $criteria = null,
         public ArrayAccess&Traversable $context = new ArrayObject(),
     ) {
+    }
+
+    public function when(string|bool|int $result): DecisionNode|Action
+    {
+        return $this->cases->get($result);
     }
 }

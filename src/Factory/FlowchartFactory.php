@@ -57,7 +57,7 @@ final readonly class FlowchartFactory implements FlowchartFactoryInterface
         // Ensure all blocks have an ID, or take the key as ID.
         array_walk($blocks, fn (array &$block, int|string $key) => $block['id'] ??= (string) $key);
 
-        $entrypoint = $this->buildStep($flowchartDefinition['entrypoint'], $blocks, $options);
+        $entrypoint = $this->buildStep($flowchartDefinition['entrypoint'], $blocks, $flowchartOptions);
         assert($entrypoint instanceof DecisionNode);
 
         if (!$flowchartOptions['allowUnhandledCases']) {
