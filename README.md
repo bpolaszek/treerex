@@ -56,13 +56,10 @@ use Traversable;
 use App\Domain\Product;
 use InvalidArgumentException;
 
-use function assert;
-
 final class ProductChecker implements CheckerInterface
 {
     /**
      * @param Product $subject
-     * @param ArrayAccess<string, mixed>&Traversable<string, mixed> $context
      */
     public function satisfies(mixed $subject, mixed $criteria, ArrayAccess&Traversable $context): bool
     {
