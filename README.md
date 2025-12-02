@@ -327,6 +327,15 @@ when@true:
 
 If the target id cannot be found, a `FlowchartRuntimeException` is thrown.
 
+## Going further
+
+### Flowchart Options
+
+Options can be defined:
+
+- At runtime, the 2nd argument of the flowchart factory
+- At build time, in the `options` key from the YAML (merged with options passed at runtime, runtime options take precedence).
+
 #### Unhandled steps
 
 If a branch (`when@true` or `when@false`) is missing entirely, that branch is considered **unhandled**. When the runner reaches it, it throws an `UnhandledStepException`, which also exposes the `RunnerState`.
@@ -335,14 +344,19 @@ This simplifies your YAML definitions, but can lead to unexpected results at run
 
 To avoid this, you can ask `FlowchartFactory` to validate that no branches are left unhandled by passing `allowUnhandledSteps = false`:
 
-```php
-use BenTools\TreeRex\Factory\TreeRexFactory;
-
-$factory = new FlowchartFactory();
-$flowchart = $factory->create($definitionArray, allowUnhandledSteps: false);
+```yaml
+options:
+    allowUnhandledSteps: false
 ```
 
-## Going further
+#### Default checker service
+
+If you're using the same checker for multiple decision nodes, you can define a default checker service that will be used for all nodes that don't specify their own checker.
+
+```yaml
+options:
+    defaultChecker: BenTools\TreeRex\Checker\ExpressionLanguageChecker
+```
 
 ### Using the ExpressionLanguageChecker
 
@@ -360,7 +374,7 @@ use Symfony\Component\Yaml\Yaml;
 $definition = Yaml::parse(<<<'YAML'
 entrypoint:
   id: stock_check
-  checker: default
+  checker: product.checker
   criteria: product.stock > 0
   when@true:
     end: true
@@ -371,7 +385,7 @@ YAML);
 $flowchart = new FlowchartFactory()->create($definition);
 
 $runner = new FlowchartRunner(new ServiceLocator([
-    'default' => new ExpressionLanguageChecker('product'),
+    'product.checker' => new ExpressionLanguageChecker('product'),
 ]));
 
 $product = new Product(stock: 10, blacklisted: false);

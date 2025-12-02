@@ -44,13 +44,18 @@ use BenTools\TreeRex\Exception\FlowchartBuildException;
  *     nodes: DecisionNodeDefinition[],
  *     context?: Context,
  * }
+ * @phpstan-type FlowchartOptions array{
+ *     allowUnhandledCases?: bool,
+ *     defaultChecker?: string,
+ * }
  */
 interface FlowchartFactoryInterface
 {
     /**
      * @param FlowchartDefinition $flowchartDefinition
+     * @param FlowchartOptions    $options
      *
      * @throws FlowchartBuildException
      */
-    public function create(array $flowchartDefinition, bool $allowUnhandledCases = true): Flowchart;
+    public function create(array $flowchartDefinition, array $options): Flowchart;
 }

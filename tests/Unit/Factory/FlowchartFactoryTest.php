@@ -115,8 +115,57 @@ describe('Flowchart Factory', function () {
                 ],
             ],
         ];
-        expect(fn () => $factory->create($flowchartDefinition, allowUnhandledCases: false))
+        expect(fn () => $factory->create($flowchartDefinition, ['allowUnhandledCases' => false]))
             ->toThrow(FlowchartBuildException::class);
+    });
+});
+
+describe('Flowchart Factory -> Options', function () {
+    $factory = new FlowchartFactory();
+
+    it('spots unhandled steps', function () use ($factory) {
+        $flowchartDefinition = [
+            'options' => ['allowUnhandledCases' => false],
+            'context' => ['foo' => 'bar'],
+            'entrypoint' => [
+                'checker' => 'some.checker.service',
+                'id' => 'root',
+                'label' => 'Root node',
+                'when@false' => ['end' => false],
+                'when@true' => [
+                    'checker' => 'some.other.checker.service',
+                    'when@true' => ['goto' => 'root'],
+                    'when@false' => [
+                        'checker' => 'yet.another.checker.service',
+                        'when@false' => ['error' => 'Ooops'],
+                    ],
+                ],
+            ],
+        ];
+        expect(fn () => $factory->create($flowchartDefinition))
+            ->toThrow(FlowchartBuildException::class);
+    });
+
+    it('accepts a default checker service', function () use ($factory) {
+        $flowchartDefinition = [
+            'options' => ['defaultChecker' => 'default.checker.service'],
+            'context' => ['foo' => 'bar'],
+            'entrypoint' => [
+                'id' => 'root',
+                'label' => 'Root node',
+                'when@false' => [
+                    'when@true' => ['end' => false],
+                ],
+                'when@true' => [
+                    'checker' => 'some.checker.service',
+                ],
+            ],
+        ];
+
+        $flowchart = $factory->create($flowchartDefinition);
+        expect($flowchart->entrypoint->checkerServiceId)->toBe('default.checker.service')
+            ->and($flowchart->entrypoint->when(true)->checkerServiceId)->toBe('some.checker.service')
+            ->and($flowchart->entrypoint->when(false)->checkerServiceId)->toBe('default.checker.service');
     });
 });
 
@@ -205,7 +254,7 @@ describe('Flowchart Factory Validation', function () {
         ];
 
         // Should not throw since both branches are actions (no unhandled steps)
-        $factory->create($definition, allowUnhandledCases: false);
+        $factory->create($definition, ['allowUnhandledCases' => false]);
 
         expect(true)->toBeTrue();
     });
