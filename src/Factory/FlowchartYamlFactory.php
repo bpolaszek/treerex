@@ -18,7 +18,7 @@ final readonly class FlowchartYamlFactory
     ) {
     }
 
-    public function parseYamlFile(string $filename): Flowchart
+    public function parseYamlFile(string $filename, bool $allowUnhandledCases = true): Flowchart
     {
         if (!is_file($filename)) {
             throw new InvalidArgumentException(sprintf('YAML file not found: %s', $filename));
@@ -27,6 +27,6 @@ final readonly class FlowchartYamlFactory
         /** @var FlowchartDefinition */
         $parsed = Yaml::parseFile($filename);
 
-        return $this->factory->create($parsed);
+        return $this->factory->create($parsed, $allowUnhandledCases);
     }
 }

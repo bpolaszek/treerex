@@ -1,279 +1,51 @@
 # TreeRex 🦖
 
+[![CI Workflow](https://github.com/bpolaszek/treerex/actions/workflows/ci.yml/badge.svg)](https://github.com/bpolaszek/treerex/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/bpolaszek/treerex/graph/badge.svg?token=JvHp2bY165)](https://codecov.io/gh/bpolaszek/treerex)
+
 Declaratively describe complex decision trees ("flowcharts") in YAML and run them at runtime against arbitrary subjects.
-
-Forget about 300‑line `if/else` chains and scattered business rules: keep your logic in **one visual flowchart**, keep your code tiny, and keep your future self happy. 💆‍♂️
-
-This library lets you:
-
-- Describe a flowchart as YAML, using **decision nodes** (`when@true`, `when@false`) and **actions** (`end`, `error`, `goto`).
-- Plug your own business rules by implementing `CheckerInterface` services.
-- Inject any PSR‑11 container so the runner can resolve your checkers (and even flowcharts) from it.
-- Inspect the **runtime state** and **history** of the flowchart execution.
-
-### TL;DR (what you get in practice) ✨
-
-- ✅ **Zero if‑else spaghetti** – complex validation / eligibility logic lives in YAML, not buried in controllers.
-- 🧩 **Composable rules** – re‑use the same checker services across many flowcharts.
-- 🔍 **Full observability** – inspect the last node, the full decision history, and enriched context.
-- 🧪 **Test‑friendly** – feed any subject + context, assert the final boolean and the reasons attached in context.
-- 🧠 **Business‑driven** – designers or analysts can reason about the YAML flowchart without reading PHP.
-
-The typical workflow is:
-
-1. Write a YAML file describing your flowchart.
-2. Implement one or more checkers (services implementing `CheckerInterface`).
-3. Build a `Flowchart` instance from YAML.
-4. Run the flowchart with `FlowchartRunner` against a subject and a context array/`ArrayObject`.
-5. Read the result (boolean) and the runner state (context key `_state`).
-
-> For convenience, an `ExpressionLanguageChecker` is provided which relies on Symfony's ExpressionLanguage component and covers most use cases. The recommended approach, however, is to implement your own checkers and provide them through your own service container or service locator.
-
-Think "**feature toggles / eligibility / complex validation** as a YAML flowchart" that you can refactor, test, and reason about without touching the consumers. 🚀
-
-
-## From diagram to YAML: a complete example
-
-
-```mermaid
-flowchart TD
-    Start([Customer wants to buy product]) --> CheckBlacklist{Is product blacklisted?}
-    
-    CheckBlacklist -->|Yes| Reject1[Reject sale: Product not available]
-    CheckBlacklist -->|No| CheckExpiry{Is product expired?}
-    
-    CheckExpiry -->|Yes| Reject2[Reject sale: Product expired]
-    CheckExpiry -->|No| CheckStock{Is product in stock?}
-    
-    CheckStock -->|No| Reject3[Reject sale: Out of stock]
-    CheckStock -->|Yes| CheckCategory{Check product category}
-    
-    CheckCategory -->|Restricted| CheckAge{Customer age >= 18?}
-    CheckCategory -->|Standard| CheckPayment{Payment method valid?}
-    CheckCategory -->|Prescription| CheckPrescription{Has valid prescription?}
-    
-    CheckAge -->|No| Reject4[Reject sale: Age restriction]
-    CheckAge -->|Yes| CheckPayment
-    
-    CheckPrescription -->|No| Reject5[Reject sale: No prescription]
-    CheckPrescription -->|Yes| CheckPayment
-    
-    CheckPayment -->|No| Reject6[Reject sale: Invalid payment]
-    CheckPayment -->|Yes| ProcessSale[Process sale]
-    
-    ProcessSale --> UpdateStock[Update stock quantity]
-    UpdateStock --> GenerateReceipt[Generate receipt]
-    GenerateReceipt --> End([Sale completed])
-    
-    Reject1 --> End
-    Reject2 --> End
-    Reject3 --> End
-    Reject4 --> End
-    Reject5 --> End
-    Reject6 --> End
-    
-    style Start fill:#90EE90
-    style End fill:#90EE90
-    style ProcessSale fill:#87CEEB
-    style Reject1 fill:#FFB6C6
-    style Reject2 fill:#FFB6C6
-    style Reject3 fill:#FFB6C6
-    style Reject4 fill:#FFB6C6
-    style Reject5 fill:#FFB6C6
-    style Reject6 fill:#FFB6C6
-```
-
-### Equivalent YAML flowchart
-
-Below is one way to express the same logic using this library, assuming you use the `ExpressionLanguageChecker` with:
-
-- the subject variable named `product`, and
-- a context that contains `customer`, `payment`, and `prescription` objects.
-
-```yaml
-context:
-  decision: null
-  reason: null
-
-entrypoint:
-  id: blacklist_check
-  label: "Is product blacklisted?"
-  checker: checker.default
-  criteria: product.blacklisted
-
-  when@true:
-    end:
-      result: false
-      context:
-        decision: "reject"
-        reason: "Product not available"
-
-  when@false:
-    id: expiry_check
-    label: "Is product expired?"
-    checker: checker.default
-    criteria: product.expired
-
-    when@true:
-      end:
-        result: false
-        context:
-          decision: "reject"
-          reason: "Product expired"
-
-    when@false:
-      id: stock_check
-      label: "Is product in stock?"
-      checker: checker.default
-      criteria: product.stock > 0
-
-      when@false:
-        end:
-          result: false
-          context:
-            decision: "reject"
-            reason: "Out of stock"
-
-      when@true:
-        id: category_restricted
-        label: "Is category restricted?"
-        checker: checker.default
-        criteria: product.category == 'restricted'
-
-        # Restricted category → customer must be >= 18
-        when@true:
-          id: age_check
-          label: "Customer age >= 18?"
-          checker: checker.default
-          criteria: context.customer.age >= 18
-
-          when@false:
-            end:
-              result: false
-              context:
-                decision: "reject"
-                reason: "Age restriction"
-
-          when@true:
-            goto: payment_check
-
-        # Not restricted → either standard or prescription
-        when@false:
-          id: category_standard
-          label: "Is category standard?"
-          checker: checker.default
-          criteria: product.category == 'standard'
-
-          # Standard category → go straight to payment check
-          when@true:
-            goto: payment_check
-
-          # Otherwise we expect a prescription category
-          when@false:
-            id: category_prescription
-            label: "Is category prescription?"
-            checker: checker.default
-            criteria: product.category == 'prescription'
-
-            when@false:
-              end:
-                result: false
-                context:
-                  decision: "reject"
-                  reason: "Unsupported category"
-
-            when@true:
-              id: prescription_check
-              label: "Has valid prescription?"
-              checker: checker.default
-              criteria: context.prescription.valid
-
-              when@false:
-                end:
-                  result: false
-                  context:
-                    decision: "reject"
-                    reason: "No valid prescription"
-
-              when@true:
-                goto: payment_check
-
-          # Shared payment check for all accepted categories
-payment_check:
-  id: payment_check
-  label: "Is payment method valid?"
-  checker: checker.default
-  criteria: context.payment.valid
-
-  when@false:
-    end:
-      result: false
-      context:
-        decision: "reject"
-        reason: "Invalid payment"
-
-  when@true:
-    end:
-      result: true
-      context:
-        decision: "accept"
-        reason: "Sale completed"
-```
-
-Notes:
-
-- Each **decision node** corresponds to a diamond in the Mermaid diagram.
-- Each **reject** box becomes an `end` action with `result: false` and a human‑readable `reason` in the context.
-- The **success path** (process sale → update stock → generate receipt → end) is modeled as a single `end` action with `result: true`; your application can then:
-  - look at `decision` / `reason` in the context, and
-  - perform `ProcessSale`, `UpdateStock`, and `GenerateReceipt` as regular application code after the flowchart completes.
-- The fan‑out on `CheckCategory` (Restricted / Standard / Prescription) is expressed as a small chain of decision nodes (`category_restricted`, `category_standard`, `category_prescription`) plus shared nodes (`age_check`, `prescription_check`, `payment_check`) that are reused via `goto`.
 
 
 ## Installation
 
-Requires **PHP 8.4+**.
-
-Install via Composer:
-
 ```bash
-composer require bentools/flowchart
+composer require bentools/treerex
 ```
 
-This will also install the following main dependencies:
+## Introduction
+Forget about 300‑line `if/else` chains and scattered business rules: keep your logic in **one visual YAML flowchart**, keep your code tiny, and keep your future self happy! 💆‍♂️
 
-- `psr/container` – for the service locator / container integration.
-- `symfony/yaml` – to load flowcharts from YAML files.
-- `symfony/options-resolver` – to validate and normalize flowchart definitions.
-- `symfony/expression-language` – used by the built‑in `ExpressionLanguageChecker`.
+This library lets you:
+
+- Describe a flowchart **as YAML**, using **decision nodes** and **actions**.
+- Bring your own services! Plug your own business rules by implementing `CheckerInterface`. 
+- Inject your framework's PSR‑11 container so the runner can resolve your checkers (and even flowcharts) from it.
+- Inspect the **runtime state** and **history** of the flowchart execution so that you know what decision nodes were reached and what their results were. ✨
+
+### TL;DR (what you get in practice) 🫵
+
+- ✅ **Zero if‑else spaghetti** – complex validation / eligibility logic lives in YAML, not buried in controllers.
+- 🧩 **Composable rules** – re‑use the same checker services across many flowcharts.
+- 🔍 **Full observability** – inspect the last node, the full decision history, and enriched context.
+- 🧪 **Test‑friendly** – feed any subject + context, assert the final result and the reasons attached in context.
+- 🧠 **Business‑driven** – Product Owners can reason about the YAML flowchart without reading PHP.
 
 
 ## Basic example
 
-This example shows:
-
-- a simple **YAML flowchart**,
-- a custom **`CheckerInterface` implementation**,
-- how to **instantiate** everything and run the flowchart with a subject and a context.
-
-### 1. Define your domain model
-
-```php
-namespace App\Domain;
-
-final class Product
-{
-    public function __construct(
-        public int $stock,
-        public bool $blacklisted,
-    ) {
-    }
-}
+So your Product Owner came up with this diagram (it's heavily simplified...):
+```mermaid
+flowchart TD
+    B{Product has positive stock?}
+    B -- false --> C[Salable: false]
+    B -- true --> D{Is product blacklisted?}
+    D -- false --> E[Salable: true]
+    D -- true --> F[[Salable: false]]
 ```
 
-### 2. Create a checker
+### 1. Implement your checkers
 
-A checker receives the **subject**, some **criteria** (opaque to the runner), and the **context**, then returns a boolean.
+A checker receives the **subject**, some **criteria** (opaque to the runner), and the **context**, then returns a boolean*.
 
 ```php
 namespace App\TreeRex\Checker;
@@ -289,12 +61,11 @@ use function assert;
 final class ProductChecker implements CheckerInterface
 {
     /**
+     * @param Product $subject
      * @param ArrayAccess<string, mixed>&Traversable<string, mixed> $context
      */
     public function satisfies(mixed $subject, mixed $criteria, ArrayAccess&Traversable $context): bool
     {
-        assert($subject instanceof Product);
-
         return match ($criteria) {
             'in_stock' => $subject->stock > 0,
             'is_blacklisted' => $subject->blacklisted,
@@ -304,11 +75,15 @@ final class ProductChecker implements CheckerInterface
 }
 ```
 
-### 3. Write the YAML flowchart
+> [!NOTE]
+> * Actually, you can also return a string or an integer (see below), but using booleans is more straightforward to get started.
 
-Create a file, for instance `config/flowcharts/product_is_salable.yaml`:
+### 2. Write your YAML flowchart
+
+Create a file, for instance `config/product_salable_flowchart.yaml`:
 
 ```yaml
+# config/product_salable_flowchart.yaml
 context: # <-- That's an optional, arbitrary array that will be passed to all decision nodes.
   reason: null
 
@@ -343,15 +118,7 @@ entrypoint:
           reason: "OK"
 ```
 
-What this flowchart does:
-
-1. Check `in_stock` on the product.
-   - If **no**, end the flowchart with `false` and set `reason = "Out of stock"`.
-2. If **yes**, check `is_blacklisted`.
-   - If **yes**, end with `false` and `reason = "Product is blacklisted"`.
-   - If **no**, end with `true` and `reason = "OK"`.
-
-### 4. Instantiate and run the flowchart
+### 3. Instantiate and run the flowchart
 
 ```php
 use ArrayObject;
@@ -363,25 +130,21 @@ use BenTools\TreeRex\Utils\ServiceLocator;
 
 require_once __DIR__.'/vendor/autoload.php';
 
+$file = __DIR__.'/config/product_salable_flowchart.yaml';
+
 // 1. Build the Flowchart from YAML
-$yamlFactory = new FlowchartYamlFactory();
-$flowchart = $yamlFactory->parseYamlFile(
-    __DIR__.'/config/flowcharts/product_is_salable.yaml',
-);
+$flowchart = new FlowchartYamlFactory()->parseYamlFile($file);
 
 // 2. Register your checker in a PSR‑11 container (here: simple ServiceLocator, but use your framework's DI container instead)
-$container = new ServiceLocator([
-    'app.checker.product' => new ProductChecker(),
-]);
+$container = new ServiceLocator(['app.checker.product' => new ProductChecker()]);
 
 // 3. Create the runner
 $runner = new FlowchartRunner($container);
 
 // 4. Prepare subject and context
 $product = new Product(stock: 10, blacklisted: false);
-$context = new ArrayObject([
-    // You can put anything you want here.
-    'requested_by' => 'alice',
+$context = new ArrayObject([ // You can put anything you want here.
+    'requested_by' => 'Alice',
 ]);
 
 // 5. Run the flowchart
@@ -389,12 +152,13 @@ $isSalable = $runner->satisfies($product, $flowchart, $context);
 
 var_dump($isSalable);          // bool(true)
 var_dump($context['reason']);  // "OK"
+var_dump($context['_state']);  // A `RunnerState` object giving you the full history of decisions!
 ```
-
 
 ## Retrieving the flowchart state
 
-The runner keeps track of its internal **state** in a `RunnerState` object. This state is always available under the special `_state` key in the **context**.
+The runner keeps track of its internal **state** in a `RunnerState` object. 
+This state is always available under the special `_state` key in the **context**.
 
 ```php
 use BenTools\TreeRex\Runner\RunnerState;
@@ -404,13 +168,13 @@ use BenTools\TreeRex\Runner\RunnerState;
 $state = $context['_state'];
 
 // Last decision node reached
-$lastNode = $state->decisionNode;    // BenTools\TreeRex\Definition\DecisionNode
+$lastNode = $state->decisionNode;
 
-// Last result (bool) for that node
-$lastResult = $state->lastResult;    // bool
+// Last result for that node
+$lastResult = $state->lastResult;
 
 // History of all decisions taken
-// array of [<node id>, <bool result>] entries
+// array of [<node id>, <result>] entries
 $history = $state->history;
 
 // For example:
@@ -425,10 +189,9 @@ You can enrich the context at different stages:
 - Initial context – the array/`ArrayObject` you pass to `FlowchartRunner::satisfies()`.
 - Flowchart root `context` – defined at the root of the YAML file (merged on top of the initial context).
 - Decision‑node `context` – each node can add/override keys in the context.
-- `end` and `error` actions can also define `context` that will be merged into the final context.
+- `end`, `goto`, and `error` actions can also define `context` that will be merged into the final context.
 
 Every time the context is extended, `_state` is automatically updated to point to the latest `RunnerState` instance.
-
 
 ## Concepts
 
@@ -476,7 +239,7 @@ A **decision node** describes:
 
 - `checker` – the service id (in your container) of the checker to use.
 - `id` – a unique id for the node (optional; autogenerated if missing, but required for `goto`).
-- `label` – any human‑friendly label.
+- `label` – any human‑friendly label (optional).
 - `criteria` – arbitrary value passed to the checker.
 - `when@true` – what to do when the checker returns `true`.
 - `when@false` – what to do when the checker returns `false`.
@@ -484,7 +247,7 @@ A **decision node** describes:
 
 `when@true` / `when@false` can each be:
 
-- another decision node (array),
+- another decision node,
 - an `end` action,
 - an `error` action,
 - a `goto` action,
@@ -579,8 +342,9 @@ $factory = new FlowchartFactory();
 $flowchart = $factory->create($definitionArray, allowUnhandledSteps: false);
 ```
 
+## Going further
 
-## Using the ExpressionLanguageChecker
+### Using the ExpressionLanguageChecker
 
 The library ships with `ExpressionLanguageChecker`, which uses Symfony's [ExpressionLanguage component](https://symfony.com/doc/current/components/expression_language.html. 
 It allows you to express criteria as strings or arrays of strings instead of writing your own checker logic.
@@ -604,13 +368,13 @@ entrypoint:
     end: false
 YAML);
 
-$flowchart = (new FlowchartFactory())->create($definition);
+$flowchart = new FlowchartFactory()->create($definition);
 
 $runner = new FlowchartRunner(new ServiceLocator([
     'default' => new ExpressionLanguageChecker('product'),
 ]));
 
-$product = new \App\Domain\Product(stock: 10, blacklisted: false);
+$product = new Product(stock: 10, blacklisted: false);
 $context = new ArrayObject();
 
 $result = $runner->satisfies($product, $flowchart, $context);
@@ -624,7 +388,7 @@ Expressions have access to:
 Example: `context.user.role === 'ADMIN' && product.stock > 0`.
 
 
-## Loading flowcharts from a container
+### Loading flowcharts from a container
 
 `FlowchartRunner::satisfies()` accepts either:
 
@@ -648,19 +412,61 @@ YAML);
 $factory = new FlowchartFactory();
 $flowchart = $factory->create($definition);
 
-$container = new ServiceLocator([
+$container = new ServiceLocator([ // <-- Ideally, this is your framework's DI container.
     'flowchart.product_is_salable' => $flowchart,
     'checker.default' => new ExpressionLanguageChecker('product'),
 ]);
 
-$runner = new FlowchartRunner($container); // <-- Ideally, this is your framework's DI container.
+$runner = new FlowchartRunner($container);
 
-// Here we pass the flowchart *id* instead of the Flowchart instance
+// Here we pass the flowchart *id* instead of the Flowchart *instance*
 $result = $runner->satisfies($product, 'flowchart.product_is_salable');
 ```
 
+### Declaring blocks at the root level
 
-## Running tests (for contributors)
+You can also declare blocks at the root level of the YAML file, and invoke them from decision nodes:
+
+```yaml
+blocks:
+  stock_check:
+    checker: app.checker.product
+    criteria: product.stock > 0
+  category_check:
+    checker: app.checker.product
+    criteria: product.category === 'electronics'
+  blacklist_check:
+    checker: app.checker.product
+    criteria: product.blacklisted
+
+entrypoint:
+  use: stock_check
+  when@true:
+    use: category_check
+  when@false:
+    use: blacklist_check
+```
+
+### Using strings or integers instead of booleans
+
+While this library is primarily designed for `true` / `false` decisions, 
+You can also use strings or integers by providing the possible values in the `cases` config option:
+
+```
+entrypoint:
+    checker: app.checker.warehouse
+    criteria: product.warehouse # <-- This will return a string
+    cases: ['main', 'secondary', 'offsite'] # <-- 
+    when@main:
+        checker: app.checker.product
+        criteria: product.stock > 0
+    when@secondary:
+        checker: app.checker.restocking
+        criteria: product.restocking
+    # ...
+```
+
+## Contributing
 
 After cloning the repository:
 
@@ -677,9 +483,10 @@ composer types:check
 Coding standards:
 
 ```bash
+# Check CS issues
 composer style:check
 
-# or to fix CS issues automatically
+# Fix CS issues
 composer style:fix
 ```
 
@@ -689,7 +496,7 @@ Run the test suite (Pest + PHPUnit) with 100% coverage requirement:
 composer tests:run
 ```
 
-Or run all checks (types, CS, tests) in one go:
+Or run all checks (types, CS, tests) in one go: ✨
 
 ```bash
 composer ci:check

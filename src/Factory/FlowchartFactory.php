@@ -92,17 +92,18 @@ final readonly class FlowchartFactory implements FlowchartFactoryInterface
     {
         $flowchartDefinition = $this->flowchartResolver->resolve($flowchartDefinition);
 
-        $context = self::toContext($flowchartDefinition['context'] ?? []);
         $blocks = $flowchartDefinition['blocks'] ?? [];
-
         // Ensure all blocks have an ID, or take the key as ID.
         array_walk($blocks, fn (array &$block, int|string $key) => $block['id'] ??= (string) $key);
+
         $entrypoint = $this->buildStep($flowchartDefinition['entrypoint'], $blocks);
         assert($entrypoint instanceof DecisionNode);
 
         if (!$allowUnhandledCases) {
             $this->ensureNoUnhandledCases($entrypoint);
         }
+
+        $context = self::toContext($flowchartDefinition['context'] ?? []);
 
         return new Flowchart($context, $entrypoint);
     }
