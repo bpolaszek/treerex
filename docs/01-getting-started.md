@@ -13,14 +13,6 @@ This library lets you:
 
 ---
 
-## Installation 💾
-
-```bash
-composer require bentools/treerex
-```
-
----
-
 ## Your first flowchart 🧪
 
 So your Product Owner came up with this diagram (it's heavily simplified...):

@@ -54,6 +54,12 @@ var_dump($context['requiresApproval']); // bool|null
 var_dump($context['_state']); // RunnerState -> gives you the full history of decisions
 ```
 
+## Installation 💾
+
+```bash
+composer require bentools/treerex
+```
+
 ## Table of contents 📚
 
 - 🚀 [Getting started](docs/01-getting-started.md)
