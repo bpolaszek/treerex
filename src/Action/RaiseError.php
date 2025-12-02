@@ -4,12 +4,10 @@ declare(strict_types=1);
 
 namespace BenTools\TreeRex\Action;
 
-use ArrayAccess;
-use ArrayObject;
 use BenTools\TreeRex\Exception\FlowchartRuntimeException;
+use BenTools\TreeRex\Runner\RunnerContext;
 use BenTools\TreeRex\Runner\RunnerState;
 use RuntimeException;
-use Traversable;
 
 use function assert;
 use function is_a;
@@ -20,12 +18,12 @@ use function is_a;
 final readonly class RaiseError extends Action
 {
     /**
-     * @param ArrayAccess<string, mixed>&Traversable<string, mixed> $context
+     * @param RunnerContext<string, mixed> $context
      */
     public function __construct(
         public string $message = 'An error occurred while running the flowchart.',
         public string $exceptionClass = RuntimeException::class,
-        public ArrayAccess&Traversable $context = new ArrayObject(),
+        public RunnerContext $context = new RunnerContext(),
     ) {
         assert(is_a($this->exceptionClass, RuntimeException::class, true));
     }

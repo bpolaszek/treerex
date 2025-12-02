@@ -4,13 +4,12 @@ declare(strict_types=1);
 
 namespace BenTools\TreeRex\Checker;
 
-use ArrayAccess;
-use Traversable;
+use BenTools\TreeRex\Runner\RunnerContext;
 
 interface CheckerInterface
 {
     /**
-     * @param ArrayAccess<string, mixed>&Traversable<string, mixed> $context
+     * @param RunnerContext<string, mixed> $context
      */
-    public function satisfies(mixed $subject, mixed $criteria, ArrayAccess&Traversable $context): bool|int|string;
+    public function satisfies(mixed $subject, mixed $criteria, RunnerContext $context): bool|int|string;
 }

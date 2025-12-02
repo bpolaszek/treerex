@@ -37,9 +37,9 @@ The library ships with `ExpressionLanguageChecker`, which uses Symfony's [Expres
 It allows you to express criteria as strings or arrays of strings instead of writing your own checker logic.
 
 ```php
-use ArrayObject;
 use BenTools\TreeRex\Checker\ExpressionLanguageChecker;
 use BenTools\TreeRex\Factory\TreeRexFactory;
+use BenTools\TreeRex\Runner\RunnerContext;
 use BenTools\TreeRex\Runner\TreeRexRunner;
 use BenTools\TreeRex\Utils\ServiceLocator;
 use Symfony\Component\Yaml\Yaml;
@@ -62,7 +62,7 @@ $runner = new FlowchartRunner(new ServiceLocator([
 ]));
 
 $product = new Product(stock: 10, blacklisted: false);
-$context = new ArrayObject();
+$context = new RunnerContext();
 
 $result = $runner->satisfies($product, $flowchart, $context);
 ```
@@ -173,7 +173,7 @@ final readonly class LoggerAwareChecker implements CheckerInterface
     {
         $result = $this->checker->satisfies($subject, $criteria, $context);
 
-        $decisionNodeId = $context['_state']->decisionNode->id;
+        $decisionNodeId = $context->state->decisionNode->id;
 
         $this->logger->debug(
             sprintf('Check `%s` returned `%s`.', $decisionNodeId, $result ? 'true' : 'false'),
@@ -204,7 +204,7 @@ final readonly class CachedChecker implements CheckerInterface
 
     public function satisfies(mixed $subject, mixed $criteria, Traversable&ArrayAccess $context): bool
     {
-        $decisionNodeId = $context['_state']->decisionNode->id;
+        $decisionNodeId = $context->state->decisionNode->id;
         $key = sprintf('flowchart-%s-%s', $decisionNodeId, $subject->id);
 
         if ($this->cache->has($key)) {

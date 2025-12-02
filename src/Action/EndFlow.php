@@ -4,10 +4,8 @@ declare(strict_types=1);
 
 namespace BenTools\TreeRex\Action;
 
-use ArrayAccess;
-use ArrayObject;
+use BenTools\TreeRex\Runner\RunnerContext;
 use BenTools\TreeRex\Runner\RunnerState;
-use Traversable;
 
 /**
  * @internal
@@ -15,11 +13,11 @@ use Traversable;
 final readonly class EndFlow extends Action
 {
     /**
-     * @param ArrayAccess<string, mixed>&Traversable<string, mixed> $context
+     * @param RunnerContext<string, mixed> $context
      */
     public function __construct(
         public bool|int|string|null $result,
-        public ArrayAccess&Traversable $context = new ArrayObject(),
+        public RunnerContext $context = new RunnerContext(),
     ) {
     }
 

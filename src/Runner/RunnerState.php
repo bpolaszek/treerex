@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace BenTools\TreeRex\Runner;
 
 use ArrayAccess;
-use ArrayObject;
 use BenTools\TreeRex\Checker\CheckerInterface;
 use BenTools\TreeRex\Definition\DecisionNode;
 use BenTools\TreeRex\Definition\Flowchart;
@@ -21,14 +20,14 @@ final class RunnerState
     public private(set) array $history = [];
 
     /**
-     * @param ArrayAccess<string, mixed>&Traversable<string, mixed> $context
+     * @param RunnerContext<string, mixed> $context
      */
     public function __construct(
         public readonly DecisionNode $decisionNode,
         public readonly mixed $subject,
         public readonly Flowchart $flowchart,
         public readonly CheckerInterface $checker,
-        public ArrayAccess&Traversable $context = new ArrayObject(),
+        public RunnerContext $context = new RunnerContext(),
     ) {
     }
 
@@ -47,7 +46,7 @@ final class RunnerState
         );
         $state->history = $this->history;
         $state->lastResult = $this->lastResult;
-        $state->context['_state'] = $state;
+        $state->context->state = $state;
 
         return $state;
     }
@@ -75,7 +74,7 @@ final class RunnerState
             }
         }
 
-        $clone->context['_state'] = $clone;
+        $clone->context->state = $clone;
 
         return $clone;
     }

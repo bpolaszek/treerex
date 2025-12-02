@@ -4,14 +4,13 @@ declare(strict_types=1);
 
 namespace BenTools\TreeRex\Tests\Integration;
 
-use ArrayAccess;
-use ArrayObject;
 use BenTools\TreeRex\Checker\CheckerInterface;
 use BenTools\TreeRex\Checker\ExpressionLanguageChecker;
 use BenTools\TreeRex\Exception\FlowchartRuntimeException;
 use BenTools\TreeRex\Exception\UnhandledStepException;
 use BenTools\TreeRex\Factory\FlowchartFactory;
 use BenTools\TreeRex\Runner\FlowchartRunner;
+use BenTools\TreeRex\Runner\RunnerContext;
 use BenTools\TreeRex\Tests\Integration\Subject\Product;
 use BenTools\TreeRex\Tests\Integration\Subject\User;
 use BenTools\TreeRex\Utils\ServiceLocator;
@@ -19,7 +18,6 @@ use RuntimeException;
 use stdClass;
 use Symfony\Component\Yaml\Yaml;
 use Throwable;
-use Traversable;
 
 use function expect;
 
@@ -80,12 +78,12 @@ describe('Flowchart Runner Test', function () use ($definition) {
     it('is sellable', function () use ($flowchart, $runner) {
         $product = new Product(stock: 10, blacklisted: false, categorized: true);
         $user = new User('GUEST');
-        $context = new ArrayObject(['user' => $user]);
+        $context = new RunnerContext(['user' => $user]);
         $sellable = $runner->satisfies($product, $flowchart, $context);
 
         expect($sellable)->toBeTrue()
-            ->and($context['_state']->decisionNode->id)->toBe('expiration_check')
-            ->and($context['_state']->history)->toBe([
+            ->and($context->state->decisionNode->id)->toBe('expiration_check')
+            ->and($context->state->history)->toBe([
                 ['stock_check', true],
                 ['blacklist_check', false],
                 ['category_check', true],
@@ -97,12 +95,12 @@ describe('Flowchart Runner Test', function () use ($definition) {
     it('is not sellable because it is not in stock', function () use ($flowchart, $runner) {
         $product = new Product(stock: 0, blacklisted: false, categorized: true);
         $user = new User('GUEST');
-        $context = new ArrayObject(['user' => $user]);
+        $context = new RunnerContext(['user' => $user]);
         $sellable = $runner->satisfies($product, $flowchart, $context);
 
         expect($sellable)->toBeFalse()
-            ->and($context['_state']->decisionNode->id)->toBe('stock_check')
-            ->and($context['_state']->history)->toBe([
+            ->and($context->state->decisionNode->id)->toBe('stock_check')
+            ->and($context->state->history)->toBe([
                 ['stock_check', false],
             ])
             ->and($context['reason'])->toBe('Out of stock')
@@ -112,12 +110,12 @@ describe('Flowchart Runner Test', function () use ($definition) {
     it('is not sellable because it is blacklisted', function () use ($flowchart, $runner) {
         $product = new Product(stock: 10, blacklisted: true, categorized: true);
         $user = new User('GUEST');
-        $context = new ArrayObject(['user' => $user]);
+        $context = new RunnerContext(['user' => $user]);
         $sellable = $runner->satisfies($product, $flowchart, $context);
 
         expect($sellable)->toBeFalse()
-            ->and($context['_state']->decisionNode->id)->toBe('role_check')
-            ->and($context['_state']->history)->toBe([
+            ->and($context->state->decisionNode->id)->toBe('role_check')
+            ->and($context->state->history)->toBe([
                 ['stock_check', true],
                 ['blacklist_check', true],
                 ['role_check', false],
@@ -129,12 +127,12 @@ describe('Flowchart Runner Test', function () use ($definition) {
     it('is sellable because it is blacklisted but user is ADMIN', function () use ($flowchart, $runner) {
         $product = new Product(stock: 10, blacklisted: true, categorized: true);
         $user = new User('ADMIN');
-        $context = new ArrayObject(['user' => $user]);
+        $context = new RunnerContext(['user' => $user]);
         $sellable = $runner->satisfies($product, $flowchart, $context);
 
         expect($sellable)->toBeTrue()
-            ->and($context['_state']->decisionNode->id)->toBe('expiration_check')
-            ->and($context['_state']->history)->toBe([
+            ->and($context->state->decisionNode->id)->toBe('expiration_check')
+            ->and($context->state->history)->toBe([
                 ['stock_check', true],
                 ['blacklist_check', true],
                 ['role_check', true],
@@ -147,10 +145,10 @@ describe('Flowchart Runner Test', function () use ($definition) {
     it('throws an error whenever a product is uncategorized', function () use ($flowchart, $runner) {
         $product = new Product(stock: 10, blacklisted: false, categorized: false);
         $user = new User('ADMIN');
-        $context = new ArrayObject(['user' => $user]);
+        $context = new RunnerContext(['user' => $user]);
         expect(fn () => $runner->satisfies($product, $flowchart, $context))
             ->toThrow(RuntimeException::class, 'Product should never be uncategorized')
-            ->and($context['_state']->history)->toBe([
+            ->and($context->state->history)->toBe([
                 ['stock_check', true],
                 ['blacklist_check', false],
                 ['category_check', false],
@@ -161,10 +159,10 @@ describe('Flowchart Runner Test', function () use ($definition) {
     it('throws an error whenever a step is unhandled', function () use ($flowchart, $runner) {
         $product = new Product(stock: 10, blacklisted: false, categorized: true, expired: true);
         $user = new User('ADMIN');
-        $context = new ArrayObject(['user' => $user]);
+        $context = new RunnerContext(['user' => $user]);
         expect(fn () => $runner->satisfies($product, $flowchart, $context))
             ->toThrow(UnhandledStepException::class)
-            ->and($context['_state']->history)->toBe([
+            ->and($context->state->history)->toBe([
                 ['stock_check', true],
                 ['blacklist_check', false],
                 ['category_check', true],
@@ -176,7 +174,7 @@ describe('Flowchart Runner Test', function () use ($definition) {
 describe('Flowchart Anomalies', function () {
     it('throws an error when checker fails', function () {
         $checker = new class implements CheckerInterface {
-            public function satisfies(mixed $subject, mixed $criteria, ArrayAccess&Traversable $context): bool
+            public function satisfies(mixed $subject, mixed $criteria, RunnerContext $context): bool
             {
                 throw new RuntimeException('💥');
             }
@@ -192,14 +190,14 @@ describe('Flowchart Anomalies', function () {
             'default' => $checker,
         ]));
         $subject = new stdClass();
-        $context = new ArrayObject([]);
+        $context = new RunnerContext([]);
         expect(fn () => $runner->satisfies($subject, $flowchart, $context))
             ->toThrow(FlowchartRuntimeException::class, '💥');
     });
 
     it('throws an error when trying to jump to an unknown node', function () {
         $checker = new class implements CheckerInterface {
-            public function satisfies(mixed $subject, mixed $criteria, ArrayAccess&Traversable $context): bool
+            public function satisfies(mixed $subject, mixed $criteria, RunnerContext $context): bool
             {
                 return true;
             }
@@ -218,7 +216,7 @@ describe('Flowchart Anomalies', function () {
             'default' => $checker,
         ]));
         $subject = new stdClass();
-        $context = new ArrayObject([]);
+        $context = new RunnerContext([]);
         expect(fn () => $runner->satisfies($subject, $flowchart, $context))
             ->toThrow(FlowchartRuntimeException::class, 'Id `neverland` not found.');
     });

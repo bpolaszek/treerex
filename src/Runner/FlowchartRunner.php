@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace BenTools\TreeRex\Runner;
 
-use ArrayAccess;
-use ArrayObject;
 use BenTools\TreeRex\Action\Action;
 use BenTools\TreeRex\Checker\CheckerInterface;
 use BenTools\TreeRex\Checker\ExpressionLanguageChecker;
@@ -16,7 +14,6 @@ use BenTools\TreeRex\Exception\SkippedSteps;
 use BenTools\TreeRex\Utils\ServiceLocator;
 use Exception;
 use Psr\Container\ContainerInterface;
-use Traversable;
 
 use function is_array;
 
@@ -32,9 +29,9 @@ final readonly class FlowchartRunner implements FlowchartRunnerInterface
     public function satisfies(
         mixed $subject,
         Flowchart|string $flowchart,
-        (ArrayAccess&Traversable)|array $context = new ArrayObject(),
+        RunnerContext|array $context = new RunnerContext(),
     ): bool|int|string {
-        $context = is_array($context) ? new ArrayObject($context) : $context;
+        $context = is_array($context) ? new RunnerContext($context) : $context;
         $flowchart = $flowchart instanceof Flowchart ? $flowchart : $this->resolveFlowchart($flowchart);
 
         $decisionNode = $flowchart->entrypoint;

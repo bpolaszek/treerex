@@ -43,15 +43,16 @@ entrypoint:
 ```php
 use BenTools\TreeRex\Factory\FlowchartYamlFactory;
 use BenTools\TreeRex\Runner\FlowchartRunner;
+use BenTools\TreeRex\Runner\RunnerContext;
 
 $flowchart = new FlowchartYamlFactory()->parseYamlFile(__DIR__.'/config/user_can_edit_post.yaml');
 $runner = new FlowchartRunner();
-$context = new ArrayObject(['post' => $post]);
+$context = new RunnerContext(['post' => $post]);
 
 $canEdit = $runner->satisfies($user, $flowchart, $context);
 var_dump($canEdit); // bool
 var_dump($context['requiresApproval']); // bool|null
-var_dump($context['_state']); // RunnerState -> gives you the full history of decisions
+var_dump($context->state); // RunnerState -> gives you the full history of decisions
 ```
 
 ## Installation 💾

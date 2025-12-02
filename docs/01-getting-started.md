@@ -107,10 +107,10 @@ entrypoint:
 ### 3. Instantiate and run the flowchart 🏃
 
 ```php
-use ArrayObject;
 use App\Domain\Product;
 use App\TreeRex\Checker\ProductChecker;
 use BenTools\TreeRex\Factory\TreeRexYamlFactory;
+use BenTools\TreeRex\Runner\RunnerContext;
 use BenTools\TreeRex\Runner\TreeRexRunner;
 use BenTools\TreeRex\Utils\ServiceLocator;
 
@@ -129,8 +129,8 @@ $runner = new FlowchartRunner($container);
 
 // 4. Prepare subject and context
 $product = new Product(stock: 10, blacklisted: false);
-$context = new ArrayObject([ // You can put anything you want here.
-    'requested_by' => 'Alice',
+$context = new RunnerContext([
+    'requested_by' => 'Alice', // You can put anything you want here.
 ]);
 
 // 5. Run the flowchart
@@ -138,7 +138,7 @@ $isSalable = $runner->satisfies($product, $flowchart, $context);
 
 var_dump($isSalable);          // bool(true)
 var_dump($context['reason']);  // "OK"
-var_dump($context['_state']);  // A `RunnerState` object giving you the full history of decisions!
+var_dump($context->state);  // A `RunnerState` object giving you the full history of decisions!
 ```
 
 ---

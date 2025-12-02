@@ -1,14 +1,14 @@
 # Flowchart state & context 🔍
 
 The runner keeps track of its internal **state** in a `RunnerState` object. 
-This state is always available under the special `_state` key in the **context**.
+This state is always available under the special `state` property in the **context**.
 
 ```php
 use BenTools\TreeRex\Runner\RunnerState;
 
 // After calling $runner->satisfies(...)
 /** @var RunnerState $state */
-$state = $context['_state'];
+$state = $context->state;
 
 // Last decision node reached
 $lastNode = $state->decisionNode;
@@ -34,7 +34,7 @@ You can enrich the context at different stages:
 - Decision‑node `context` – each node can add/override keys in the context.
 - `end`, `goto`, and `error` actions can also define `context` that will be merged into the final context.
 
-Every time the context is extended, `_state` is automatically updated to point to the latest `RunnerState` instance.
+Every time the context is extended, its `state` property is automatically updated to point to the latest `RunnerState` instance.
 
 ---
 

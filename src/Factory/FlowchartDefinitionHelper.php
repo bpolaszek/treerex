@@ -4,14 +4,12 @@ declare(strict_types=1);
 
 namespace BenTools\TreeRex\Factory;
 
-use ArrayAccess;
-use ArrayObject;
 use BenTools\TreeRex\Action\EndFlow;
 use BenTools\TreeRex\Definition\DecisionNode;
 use BenTools\TreeRex\Exception\FlowchartBuildException;
+use BenTools\TreeRex\Runner\RunnerContext;
 use Symfony\Component\OptionsResolver\Exception\InvalidOptionsException;
 use Symfony\Component\OptionsResolver\OptionsResolver;
-use Traversable;
 
 use function abs;
 use function array_filter;
@@ -203,11 +201,11 @@ final readonly class FlowchartDefinitionHelper
     /**
      * @param array<string,mixed> $values
      *
-     * @return ArrayAccess<string, mixed>&Traversable<string, mixed>
+     * @return RunnerContext<string, mixed>
      */
-    public static function toContext(array $values): ArrayAccess&Traversable
+    public static function toContext(array $values): RunnerContext
     {
-        return new ArrayObject($values);
+        return new RunnerContext($values);
     }
 
     public static function ensureNoUnhandledCases(DecisionNode $decisionNode): void

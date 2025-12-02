@@ -4,10 +4,8 @@ declare(strict_types=1);
 
 namespace BenTools\TreeRex\Definition;
 
-use ArrayAccess;
-use ArrayObject;
 use BenTools\TreeRex\Action\Action;
-use Traversable;
+use BenTools\TreeRex\Runner\RunnerContext;
 
 /**
  * @internal
@@ -15,7 +13,7 @@ use Traversable;
 final readonly class DecisionNode
 {
     /**
-     * @param ArrayAccess<string, mixed>&Traversable<string, mixed> $context
+     * @param RunnerContext<string, mixed> $context
      */
     public function __construct(
         public string $checkerServiceId,
@@ -23,7 +21,7 @@ final readonly class DecisionNode
         public Cases $cases,
         public ?string $label = null,
         public mixed $criteria = null,
-        public ArrayAccess&Traversable $context = new ArrayObject(),
+        public RunnerContext $context = new RunnerContext(),
     ) {
     }
 

@@ -4,10 +4,9 @@ declare(strict_types=1);
 
 namespace BenTools\TreeRex\Checker;
 
-use ArrayAccess;
+use BenTools\TreeRex\Runner\RunnerContext;
 use InvalidArgumentException;
 use Symfony\Component\ExpressionLanguage\ExpressionLanguage;
-use Traversable;
 
 use function array_all;
 use function get_debug_type;
@@ -20,7 +19,7 @@ final readonly class ExpressionLanguageChecker implements CheckerInterface
     ) {
     }
 
-    public function satisfies(mixed $subject, mixed $criteria, ArrayAccess&Traversable $context): string|int|bool
+    public function satisfies(mixed $subject, mixed $criteria, RunnerContext $context): string|int|bool
     {
         $criteriaType = get_debug_type($criteria);
 
@@ -32,15 +31,13 @@ final readonly class ExpressionLanguageChecker implements CheckerInterface
     }
 
     /**
-     * @param ArrayAccess<string, mixed>&Traversable<string, mixed> $context
+     * @param RunnerContext<string, mixed> $context
      */
-    private function check(string $expression, mixed $subject, ArrayAccess&Traversable $context): string|int|bool
+    private function check(string $expression, mixed $subject, RunnerContext $context): string|int|bool
     {
-        $result = $this->expressionLanguage->evaluate($expression, [
+        return $this->expressionLanguage->evaluate($expression, [ // @phpstan-ignore return.type
             $this->subjectVariable => $subject,
             'context' => (object) [...$context],
         ]);
-
-        return $result; // @phpstan-ignore return.type
     }
 }
