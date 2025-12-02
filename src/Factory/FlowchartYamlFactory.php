@@ -10,6 +10,7 @@ use Symfony\Component\Yaml\Yaml;
 
 /**
  * @phpstan-import-type FlowchartDefinition from FlowchartFactoryInterface
+ * @phpstan-import-type FlowchartOptions from FlowchartFactoryInterface
  */
 final readonly class FlowchartYamlFactory
 {
@@ -18,7 +19,10 @@ final readonly class FlowchartYamlFactory
     ) {
     }
 
-    public function parseYamlFile(string $filename, bool $allowUnhandledCases = true): Flowchart
+    /**
+     * @param FlowchartOptions $options
+     */
+    public function parseYamlFile(string $filename, array $options = []): Flowchart
     {
         if (!is_file($filename)) {
             throw new InvalidArgumentException(sprintf('YAML file not found: %s', $filename));
@@ -27,6 +31,6 @@ final readonly class FlowchartYamlFactory
         /** @var FlowchartDefinition */
         $parsed = Yaml::parseFile($filename);
 
-        return $this->factory->create($parsed, $allowUnhandledCases);
+        return $this->factory->create($parsed, $options);
     }
 }

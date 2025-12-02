@@ -115,7 +115,7 @@ describe('Flowchart Factory', function () {
                 ],
             ],
         ];
-        expect(fn () => $factory->create($flowchartDefinition, allowUnhandledCases: false))
+        expect(fn () => $factory->create($flowchartDefinition, ['allowUnhandledCases' => false]))
             ->toThrow(FlowchartBuildException::class);
     });
 });
@@ -205,7 +205,7 @@ describe('Flowchart Factory Validation', function () {
         ];
 
         // Should not throw since both branches are actions (no unhandled steps)
-        $factory->create($definition, allowUnhandledCases: false);
+        $factory->create($definition, ['allowUnhandledCases' => false]);
 
         expect(true)->toBeTrue();
     });

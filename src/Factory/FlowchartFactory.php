@@ -11,7 +11,6 @@ use BenTools\TreeRex\Action\EndFlow;
 use BenTools\TreeRex\Action\GotoNode;
 use BenTools\TreeRex\Action\RaiseError;
 use BenTools\TreeRex\Action\UnhandledStep;
-use BenTools\TreeRex\Checker\CheckerInterface;
 use BenTools\TreeRex\Definition\Cases;
 use BenTools\TreeRex\Definition\DecisionNode;
 use BenTools\TreeRex\Definition\Flowchart;
@@ -41,6 +40,7 @@ use function str_starts_with;
 use const ARRAY_FILTER_USE_KEY;
 
 /**
+ * @phpstan-import-type FlowchartOptions from FlowchartFactoryInterface
  * @phpstan-import-type DecisionNodeDefinition from FlowchartFactoryInterface
  * @phpstan-import-type ReusableBlockDefinition from FlowchartFactoryInterface
  * @phpstan-import-type EndDefinition from FlowchartFactoryInterface
@@ -49,7 +49,8 @@ use const ARRAY_FILTER_USE_KEY;
  */
 final readonly class FlowchartFactory implements FlowchartFactoryInterface
 {
-    private const array FLOWCHART_ROOT_KEYS = ['entrypoint', 'context', 'blocks'];
+    private const array FLOWCHART_ROOT_KEYS = ['entrypoint', 'context', 'blocks', 'options'];
+    private const array FLOWCHART_OPTIONS_KEYS = ['allowUnhandledCases', 'defaultChecker'];
     private const array FLOWCHART_DECISION_NODE_KEYS = [
         'checker',
         'id',
@@ -64,6 +65,7 @@ final readonly class FlowchartFactory implements FlowchartFactoryInterface
     ];
     private const array FLOWCHART_ACTIONS = ['end', 'goto', 'error'];
     private OptionsResolver $flowchartResolver;
+    private OptionsResolver $flowchartOptionsResolver;
     private OptionsResolver $decisionNodeResolver;
 
     public function __construct()
@@ -73,9 +75,15 @@ final readonly class FlowchartFactory implements FlowchartFactoryInterface
             ->setRequired(['entrypoint'])
             ->setAllowedTypes('context', ['array', 'null']);
 
+        $this->flowchartOptionsResolver = new OptionsResolver()
+            ->setDefined(self::FLOWCHART_OPTIONS_KEYS)
+            ->setAllowedTypes('allowUnhandledCases', ['bool'])
+            ->setAllowedTypes('defaultChecker', ['string'])
+            ->setDefaults(['allowUnhandledCases' => true]);
+
         $this->decisionNodeResolver = new OptionsResolver();
         $this->decisionNodeResolver->setDefined(self::FLOWCHART_DECISION_NODE_KEYS);
-        $this->decisionNodeResolver->setAllowedTypes('checker', ['string', 'null', CheckerInterface::class]);
+        $this->decisionNodeResolver->setAllowedTypes('checker', ['string', 'null']);
         $this->decisionNodeResolver->setAllowedTypes('id', ['string', 'null']);
         $this->decisionNodeResolver->setAllowedTypes('label', ['string', 'null']);
         $this->decisionNodeResolver->setAllowedTypes('use', ['string', 'null']);
@@ -88,19 +96,23 @@ final readonly class FlowchartFactory implements FlowchartFactoryInterface
         $this->decisionNodeResolver->setAllowedValues('goto', self::validateGoto(...));
     }
 
-    public function create(array $flowchartDefinition, bool $allowUnhandledCases = true): Flowchart
+    public function create(array $flowchartDefinition, array $options = []): Flowchart
     {
         $flowchartDefinition = $this->flowchartResolver->resolve($flowchartDefinition);
+        $flowchartOptions = $this->flowchartOptionsResolver->resolve([
+            ...$flowchartDefinition['options'] ?? [],
+            ...$options,
+        ]);
 
         $blocks = $flowchartDefinition['blocks'] ?? [];
         // Ensure all blocks have an ID, or take the key as ID.
         array_walk($blocks, fn (array &$block, int|string $key) => $block['id'] ??= (string) $key);
 
-        $entrypoint = $this->buildStep($flowchartDefinition['entrypoint'], $blocks);
+        $entrypoint = $this->buildStep($flowchartDefinition['entrypoint'], $blocks, $options);
         assert($entrypoint instanceof DecisionNode);
 
-        if (!$allowUnhandledCases) {
-            $this->ensureNoUnhandledCases($entrypoint);
+        if (!$flowchartOptions['allowUnhandledCases']) {
+            self::ensureNoUnhandledCases($entrypoint);
         }
 
         $context = self::toContext($flowchartDefinition['context'] ?? []);
@@ -111,8 +123,9 @@ final readonly class FlowchartFactory implements FlowchartFactoryInterface
     /**
      * @param bool|DecisionNodeDefinition|null $data
      * @param ReusableBlockDefinition[]        $blocks
+     * @param FlowchartOptions                 $options
      */
-    private function buildStep(bool|int|string|array|null $data, array $blocks): Action|DecisionNode
+    private function buildStep(bool|int|string|array|null $data, array $blocks, array $options): Action|DecisionNode
     {
         if (null === $data) {
             return new UnhandledStep();
@@ -142,21 +155,25 @@ final readonly class FlowchartFactory implements FlowchartFactoryInterface
             array_key_exists('end', $data) => self::normalizeEnd($data['end']),
             array_key_exists('error', $data) => new RaiseError(...(array) $data['error']),
             array_key_exists('goto', $data) => new GotoNode(...(array) $data['goto']),
-            default => $this->buildDecisionNode($data, $blocks), // @phpstan-ignore argument.type
+            default => $this->buildDecisionNode($data, $blocks, $options), // @phpstan-ignore argument.type
         };
     }
 
     /**
      * @param DecisionNodeDefinition    $data
      * @param ReusableBlockDefinition[] $blocks
+     * @param FlowchartOptions          $options
      */
-    private function buildDecisionNode(array $data, array $blocks): DecisionNode
+    private function buildDecisionNode(array $data, array $blocks, array $options): DecisionNode
     {
         $cases = $data['cases'] ?? [true, false];
+        $id = $data['id'] ?? generate_id();
+        $checkerServiceId = $data['checker'] ?? $options['defaultChecker']
+            ?? throw new FlowchartBuildException("No default checker defined at step `{$id}`.");
 
         $decisionNode = new DecisionNode(
-            checkerServiceId: $data['checker'],
-            id: $data['id'] ?? generate_id(),
+            checkerServiceId: $checkerServiceId,
+            id: $id,
             cases: new Cases($cases),
             label: $data['label'] ?? null,
             criteria: $data['criteria'] ?? null,
@@ -169,13 +186,13 @@ final readonly class FlowchartFactory implements FlowchartFactoryInterface
             if (null !== $next) {
                 self::validateNode($next); // @phpstan-ignore argument.type
             }
-            $decisionNode->cases->when($decisionNode->id, $case, $this->buildStep($next, $blocks)); // @phpstan-ignore argument.type
+            $decisionNode->cases->when($decisionNode->id, $case, $this->buildStep($next, $blocks, $options)); // @phpstan-ignore argument.type
         }
 
         return $decisionNode;
     }
 
-    private function ensureNoUnhandledCases(DecisionNode $decisionNode): void
+    private static function ensureNoUnhandledCases(DecisionNode $decisionNode): void
     {
         $unhandledCases = $decisionNode->cases->getUnHandledCases();
         if ($unhandledCases) {
@@ -183,7 +200,7 @@ final readonly class FlowchartFactory implements FlowchartFactoryInterface
         }
         foreach ($decisionNode->cases as $step) {
             if ($step instanceof DecisionNode) {
-                $this->ensureNoUnhandledCases($step);
+                self::ensureNoUnhandledCases($step);
             }
         }
     }
