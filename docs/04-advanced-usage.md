@@ -153,6 +153,72 @@ entrypoint:
     # ...
 ```
 
+## Decorate your checkers
+
+How about logging your checks?
+
+```php
+use BenTools\TreeRex\Checker\CheckerInterface;
+use Psr\Log\LoggerInterface;
+
+final readonly class LoggerAwareChecker implements CheckerInterface
+{
+    public function __construct(
+        private CheckerInterface $checker,
+        private LoggerInterface $logger,
+    ) {
+    }
+
+    public function satisfies(mixed $subject, mixed $criteria, Traversable&ArrayAccess $context): bool
+    {
+        $result = $this->checker->satisfies($subject, $criteria, $context);
+
+        $decisionNodeId = $context['_state']->decisionNode->id;
+
+        $this->logger->debug(
+            sprintf('Check `%s` returned `%s`.', $decisionNodeId, $result ? 'true' : 'false'),
+            [
+                'subject' => $subject,
+                'criteria' => $criteria,
+            ],
+        );
+
+        return $result;
+    }
+}
+```
+
+How about caching your checks?
+
+```php
+use BenTools\TreeRex\Checker\CheckerInterface;
+use Psr\SimpleCache\CacheInterface;
+
+final readonly class CachedChecker implements CheckerInterface
+{
+    public function __construct(
+        private CheckerInterface $checker,
+        private CacheInterface $cache,
+    ) {
+    }
+
+    public function satisfies(mixed $subject, mixed $criteria, Traversable&ArrayAccess $context): bool
+    {
+        $decisionNodeId = $context['_state']->decisionNode->id;
+        $key = sprintf('flowchart-%s-%s', $decisionNodeId, $subject->id);
+
+        if ($this->cache->has($key)) {
+            return $this->cache->get($key);
+        }
+
+        $result = $this->checker->satisfies($subject, $criteria, $context);
+        $this->cache->set($key, $result);
+
+        return $result;
+    }
+}
+```
+
 ---
 
 ⬅️ Previous: [Core concepts](03-core-concepts.md)  
