@@ -24,7 +24,7 @@ final readonly class GotoNode extends Action
     /**
      * @throws SkippedSteps
      */
-    public function __invoke(RunnerState $state): bool
+    public function __invoke(RunnerState $state): never
     {
         throw new SkippedSteps($this->id, $state->withAppendedContext($this->context));
     }

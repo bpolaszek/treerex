@@ -14,6 +14,7 @@ use BenTools\TreeRex\Exception\SkippedSteps;
 use BenTools\TreeRex\Utils\ServiceLocator;
 use Exception;
 use Psr\Container\ContainerInterface;
+use UnitEnum;
 
 use function is_array;
 
@@ -30,7 +31,7 @@ final readonly class FlowchartRunner implements FlowchartRunnerInterface
         mixed $subject,
         Flowchart|string $flowchart,
         RunnerContext|array $context = new RunnerContext(),
-    ): bool|int|string {
+    ): bool|int|string|UnitEnum {
         $context = is_array($context) ? new RunnerContext($context) : $context;
         $flowchart = $flowchart instanceof Flowchart ? $flowchart : $this->resolveFlowchart($flowchart);
 
@@ -46,7 +47,7 @@ final readonly class FlowchartRunner implements FlowchartRunnerInterface
     /**
      * @throws SkippedSteps
      */
-    private function process(RunnerState $state): bool|int|string
+    private function process(RunnerState $state): bool|int|string|UnitEnum
     {
         $decisionNode = $state->decisionNode;
         try {

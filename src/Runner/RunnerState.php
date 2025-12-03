@@ -7,13 +7,14 @@ namespace BenTools\TreeRex\Runner;
 use BenTools\TreeRex\Checker\CheckerInterface;
 use BenTools\TreeRex\Definition\DecisionNode;
 use BenTools\TreeRex\Definition\Flowchart;
+use UnitEnum;
 
 final class RunnerState
 {
-    public private(set) bool|string|int $lastResult;
+    public private(set) bool|string|int|UnitEnum $lastResult;
 
     /**
-     * @var array{0: string, 1: bool|int|string}[]
+     * @var array{0: string, 1: bool|int|string|UnitEnum}[]
      */
     public private(set) array $history = [];
 
@@ -55,7 +56,7 @@ final class RunnerState
     /**
      * @internal
      */
-    public function withLastResult(bool|int|string $result, DecisionNode $decisionNode): self
+    public function withLastResult(bool|int|string|UnitEnum $result, DecisionNode $decisionNode): self
     {
         $clone = clone $this;
         $clone->lastResult = $result;

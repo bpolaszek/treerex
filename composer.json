@@ -28,7 +28,8 @@
   "autoload": {
     "psr-4": {
       "BenTools\\TreeRex\\": "src/"
-    }
+    },
+    "files": ["src/functions.php"]
   },
   "autoload-dev": {
     "psr-4": {
