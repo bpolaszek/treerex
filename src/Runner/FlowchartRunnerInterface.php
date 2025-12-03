@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace BenTools\TreeRex\Runner;
 
 use BenTools\TreeRex\Definition\Flowchart;
+use UnitEnum;
 
 interface FlowchartRunnerInterface
 {
@@ -15,5 +16,5 @@ interface FlowchartRunnerInterface
         mixed $subject,
         Flowchart|string $flowchart,
         RunnerContext|array $context = new RunnerContext(),
-    ): bool|int|string;
+    ): bool|int|string|UnitEnum;
 }

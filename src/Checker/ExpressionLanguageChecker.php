@@ -7,6 +7,7 @@ namespace BenTools\TreeRex\Checker;
 use BenTools\TreeRex\Runner\RunnerContext;
 use InvalidArgumentException;
 use Symfony\Component\ExpressionLanguage\ExpressionLanguage;
+use UnitEnum;
 
 use function array_all;
 use function get_debug_type;
@@ -19,8 +20,11 @@ final readonly class ExpressionLanguageChecker implements CheckerInterface
     ) {
     }
 
-    public function satisfies(mixed $subject, mixed $criteria, RunnerContext $context): string|int|bool
-    {
+    public function satisfies(
+        mixed $subject,
+        mixed $criteria,
+        RunnerContext $context,
+    ): string|int|bool|UnitEnum {
         $criteriaType = get_debug_type($criteria);
 
         return match ($criteriaType) {
@@ -33,8 +37,11 @@ final readonly class ExpressionLanguageChecker implements CheckerInterface
     /**
      * @param RunnerContext<string, mixed> $context
      */
-    private function check(string $expression, mixed $subject, RunnerContext $context): string|int|bool
-    {
+    private function check(
+        string $expression,
+        mixed $subject,
+        RunnerContext $context,
+    ): string|int|bool|UnitEnum {
         return $this->expressionLanguage->evaluate($expression, [ // @phpstan-ignore return.type
             $this->subjectVariable => $subject,
             'context' => (object) [...$context],

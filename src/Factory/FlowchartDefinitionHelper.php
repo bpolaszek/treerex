@@ -5,14 +5,17 @@ declare(strict_types=1);
 namespace BenTools\TreeRex\Factory;
 
 use BenTools\TreeRex\Action\EndFlow;
+use BenTools\TreeRex\Definition\Cases;
 use BenTools\TreeRex\Definition\DecisionNode;
 use BenTools\TreeRex\Exception\FlowchartBuildException;
 use Symfony\Component\OptionsResolver\Exception\InvalidOptionsException;
 use Symfony\Component\OptionsResolver\OptionsResolver;
+use UnitEnum;
 
 use function abs;
 use function array_filter;
 use function array_keys;
+use function array_map;
 use function count;
 use function hash;
 use function implode;
@@ -79,7 +82,7 @@ final readonly class FlowchartDefinitionHelper
             ->setAllowedTypes('id', ['string', 'null'])
             ->setAllowedTypes('label', ['string', 'null'])
             ->setAllowedTypes('use', ['string', 'null'])
-            ->setAllowedTypes('cases', ['(bool|int|string)[]', 'null'])
+            ->setAllowedTypes('cases', ['(bool|int|string|UnitEnum)[]', 'null'])
             ->setAllowedTypes('end', ['bool', 'array'])
             ->setAllowedTypes('error', ['string', 'array'])
             ->setAllowedTypes('goto', ['string', 'array'])
@@ -89,9 +92,9 @@ final readonly class FlowchartDefinitionHelper
     }
 
     /**
-     * @param bool|EndDefinition $data
+     * @param bool|int|string|UnitEnum|EndDefinition $data
      */
-    public static function normalizeEnd(bool|array $data): EndFlow
+    public static function normalizeEnd(bool|int|string|UnitEnum|array $data): EndFlow
     {
         return match (is_array($data)) {
             true => new EndFlow($data['result'] ?? null, $data['context'] ?? []),
@@ -100,9 +103,9 @@ final readonly class FlowchartDefinitionHelper
     }
 
     /**
-     * @param bool|int|string|DecisionNodeDefinition $node
+     * @param bool|int|string|UnitEnum|DecisionNodeDefinition $node
      */
-    public static function validateNode(bool|int|string|array $node): void
+    public static function validateNode(bool|int|string|UnitEnum|array $node): void
     {
         if (!is_array($node)) {
             return;
@@ -119,9 +122,9 @@ final readonly class FlowchartDefinitionHelper
     }
 
     /**
-     * @param bool|int|string|EndDefinition $end
+     * @param bool|int|string|UnitEnum|EndDefinition $end
      */
-    private static function validateEnd(bool|int|string|array $end): bool
+    private static function validateEnd(bool|int|string|UnitEnum|array $end): bool
     {
         if (!is_array($end)) {
             return true;
@@ -201,7 +204,8 @@ final readonly class FlowchartDefinitionHelper
     {
         $unhandledCases = $decisionNode->cases->getUnHandledCases();
         if ($unhandledCases) {
-            throw new FlowchartBuildException(sprintf('Cases `%s` are not handled at step `%s`.', implode(', ', $unhandledCases), $decisionNode->id));
+            $unhandledCases = array_map(Cases::stringify(...), $unhandledCases);
+            throw new FlowchartBuildException(sprintf('Cases `%s` are not handled at step `%s`.', implode(', ', array_map(Cases::stringify(...), $unhandledCases)), $decisionNode->id));
         }
         foreach ($decisionNode->cases as $step) {
             if ($step instanceof DecisionNode) {

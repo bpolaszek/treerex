@@ -14,6 +14,7 @@ use BenTools\TreeRex\Definition\DecisionNode;
 use BenTools\TreeRex\Definition\Flowchart;
 use BenTools\TreeRex\Exception\FlowchartBuildException;
 use Symfony\Component\OptionsResolver\OptionsResolver;
+use UnitEnum;
 
 use function array_diff_key;
 use function array_filter;
@@ -70,11 +71,11 @@ final readonly class FlowchartFactory implements FlowchartFactoryInterface
     }
 
     /**
-     * @param bool|DecisionNodeDefinition|null $data
-     * @param ReusableBlockDefinition[]        $blocks
-     * @param FlowchartOptions                 $options
+     * @param bool|int|string|UnitEnum|DecisionNodeDefinition|null $data
+     * @param ReusableBlockDefinition[]                            $blocks
+     * @param FlowchartOptions                                     $options
      */
-    private function buildStep(bool|int|string|array|null $data, array $blocks, array $options): Action|DecisionNode
+    private function buildStep(bool|int|string|UnitEnum|array|null $data, array $blocks, array $options): Action|DecisionNode
     {
         if (null === $data) {
             return new UnhandledStep();

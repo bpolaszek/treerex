@@ -6,6 +6,7 @@ namespace BenTools\TreeRex\Factory;
 
 use BenTools\TreeRex\Definition\Flowchart;
 use BenTools\TreeRex\Exception\FlowchartBuildException;
+use UnitEnum;
 
 /**
  * @phpstan-type Context array<string, mixed>
@@ -13,7 +14,7 @@ use BenTools\TreeRex\Exception\FlowchartBuildException;
  *     id: string,
  *     checker?: string,
  *     label?: string,
- *     end?: EndDefinition|bool,
+ *     end?: EndDefinition|bool|int|string|UnitEnum,
  *     error?: ErrorDefinition|string,
  *     goto?: GotoDefinition|string,
  * }

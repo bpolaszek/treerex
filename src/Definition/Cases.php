@@ -4,41 +4,42 @@ declare(strict_types=1);
 
 namespace BenTools\TreeRex\Definition;
 
+use BackedEnum;
 use BenTools\TreeRex\Action\Action;
 use BenTools\TreeRex\Action\UnhandledStep;
 use BenTools\TreeRex\Exception\FlowchartBuildException;
 use IteratorAggregate;
 use RuntimeException;
 use Traversable;
+use UnitEnum;
 
 use function array_column;
-use function array_diff;
 use function array_filter;
 use function array_find;
-use function array_unique;
-use function array_values;
+use function BenTools\TreeRex\safe_array_diff;
+use function BenTools\TreeRex\safe_array_unique;
 use function sprintf;
 
 /**
  * @internal
  *
- * @implements IteratorAggregate<string|bool|int, DecisionNode|Action>
+ * @implements IteratorAggregate<string|bool|int|UnitEnum, DecisionNode|Action>
  */
 final class Cases implements IteratorAggregate
 {
     /**
-     * @var array{0: string|bool|int, 1: DecisionNode|Action}[]
+     * @var array{0: string|bool|int|UnitEnum, 1: DecisionNode|Action}[]
      */
     public private(set) array $conditions = [];
 
     /**
-     * @param list<bool|string|int> $cases
+     * @param list<bool|string|int|UnitEnum> $cases
      */
     public function __construct(private readonly array $cases)
     {
     }
 
-    public function when(string $decisionNodeId, string|bool|int $result, DecisionNode|Action $next): void
+    public function when(string $decisionNodeId, string|bool|int|UnitEnum $result, DecisionNode|Action $next): void
     {
         if (array_find($this->conditions, fn (array $condition) => $condition[0] === $result)) {
             throw new FlowchartBuildException(sprintf('`%s`: Case `%s` is already defined.', $decisionNodeId, self::stringify($result)));
@@ -46,20 +47,20 @@ final class Cases implements IteratorAggregate
         $this->conditions[] = [$result, $next];
     }
 
-    public function get(string|bool|int $result): DecisionNode|Action
+    public function get(string|bool|int|UnitEnum $result): DecisionNode|Action
     {
-        $condition = array_find($this->conditions, fn (array $condition) => $condition[0] === $result)
+        [, $next] = array_find($this->conditions, fn (array $condition) => $condition[0] === $result)
             ?? throw new RuntimeException(sprintf('No case found for result: `%s`.', self::stringify($result)));
 
-        return $condition[1];
+        return $next;
     }
 
     /**
-     * @return list<bool|string|int>
+     * @return list<bool|string|int|UnitEnum>
      */
     public function getUnHandledCases(): array
     {
-        $missingCases = array_diff($this->cases, array_column($this->conditions, 0));
+        $missingCases = safe_array_diff($this->cases, array_column($this->conditions, 0));
         $explicitelyUnhandledCases = array_column(
             array_filter(
                 $this->conditions,
@@ -68,7 +69,7 @@ final class Cases implements IteratorAggregate
             0,
         );
 
-        return array_values(array_unique([...$missingCases, ...$explicitelyUnhandledCases]));
+        return safe_array_unique([...$missingCases, ...$explicitelyUnhandledCases]);
     }
 
     public function getIterator(): Traversable
@@ -78,11 +79,13 @@ final class Cases implements IteratorAggregate
         }
     }
 
-    public static function stringify(bool|int|string $case): string
+    public static function stringify(bool|int|string|UnitEnum $case): string
     {
-        return match ($case) {
-            true => 'true',
-            false => 'false',
+        return match (true) {
+            true === $case => 'true',
+            false === $case => 'false',
+            $case instanceof BackedEnum => (string) $case->value,
+            $case instanceof UnitEnum => $case->name,
             default => (string) $case,
         };
     }

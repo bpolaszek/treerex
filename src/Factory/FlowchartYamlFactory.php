@@ -20,16 +20,17 @@ final readonly class FlowchartYamlFactory
     }
 
     /**
-     * @param FlowchartOptions $options
+     * @param int-mask-of<Yaml::PARSE_*> $flags
+     * @param FlowchartOptions           $options
      */
-    public function parseYamlFile(string $filename, array $options = []): Flowchart
+    public function parseYamlFile(string $filename, int $flags = Yaml::PARSE_CONSTANT, array $options = []): Flowchart
     {
         if (!is_file($filename)) {
             throw new InvalidArgumentException(sprintf('YAML file not found: %s', $filename));
         }
 
         /** @var FlowchartDefinition */
-        $parsed = Yaml::parseFile($filename);
+        $parsed = Yaml::parseFile($filename, $flags);
 
         return $this->factory->create($parsed, $options);
     }
