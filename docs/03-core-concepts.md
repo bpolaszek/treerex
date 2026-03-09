@@ -74,14 +74,18 @@ There are three explicit actions:
 
 ### `end`
 
-Ends the flowchart and returns a boolean result.
+Ends the flowchart and returns a result.
 
 YAML variants:
 
 ```yaml
-# Short form: just a boolean result
+# Short form: boolean
 when@true:
   end: true
+
+# Short form: string (useful for multi-outcome flowcharts, but be cautious with `when@...` parsing)
+when@true:
+  end: HIT
 
 # Long form: result + extra context
 when@false:
@@ -89,7 +93,18 @@ when@false:
     result: false
     context:
       reason: "Something went wrong"
+
+# Long form with string result
+when@false:
+  end:
+    result: BYPASS
+    context:
+      reason: "Not cacheable"
 ```
+
+> [!TIP]
+> String and integer results are especially useful when your flowchart has more than two possible outcomes.
+> The caller can then `match` on the result to decide what to do next.
 
 ### `error`
 
@@ -142,7 +157,75 @@ when@true:
 
 If the target id cannot be found, a `FlowchartRuntimeException` is thrown.
 
+## Side effects
+
+A **side effect** is an action that runs alongside `end`, `goto`, or `error`. It lets you trigger external operations (dispatching messages, writing to cache, logging, …) without polluting your checker logic.
+
+Side effects are resolved from the same PSR-11 container as checkers. They implement `SideEffectInterface`:
+
+```php
+use BenTools\TreeRex\SideEffect\SideEffectInterface;
+use BenTools\TreeRex\Runner\RunnerState;
+
+final readonly class DispatchRevalidation implements SideEffectInterface
+{
+    public function __construct(private MessageBusInterface $messageBus)
+    {
+    }
+
+    public function execute(RunnerState $state): void
+    {
+        $this->messageBus->dispatch(
+            new RevalidateCacheMessage($state->context['cachedResponse']),
+        );
+    }
+}
+```
+
+### YAML syntax
+
+A `sideEffect` key can be added next to any action (`end`, `goto`, or `error`):
+
+```yaml
+# Short form (executes before the action by default)
+when@true:
+  end: HIT_STALE
+  sideEffect: app.side_effect.dispatch_revalidation
+
+# Long form (with timing and context)
+when@true:
+  end: MISS
+  sideEffect:
+    id: app.side_effect.store_cache
+    timing: after    # "before" (default) or "after"
+    context:
+      stored: true
+```
+
+### Timing
+
+- `before` (default) – the side effect executes **before** the action resolves.
+- `after` – the side effect executes **after** the action resolves.
+
+> [!NOTE]
+> For `goto` and `error` actions, only `before` timing is meaningful, since these actions never "complete" normally.
+
+### Error handling
+
+If a side effect throws an exception, it is wrapped in a `SideEffectException` (which extends `FlowchartException`). This lets you distinguish side-effect failures from checker or flowchart errors:
+
+```php
+use BenTools\TreeRex\Exception\SideEffectException;
+
+try {
+    $result = $runner->satisfies($subject, $flowchart, $context);
+} catch (SideEffectException $e) {
+    // $e->state gives you the RunnerState at the time of failure
+    // $e->getPrevious() gives you the original exception
+}
+```
+
 ---
 
-⬅️ Previous: [Flowchart state & context](02-flowchart-state.md)  
+⬅️ Previous: [Flowchart state & context](02-flowchart-state.md)
 ➡️ Next: [Advanced usage](04-advanced-usage.md)

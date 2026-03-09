@@ -135,7 +135,7 @@ entrypoint:
 
 ## Using strings or integers instead of booleans
 
-While this library is primarily designed for `true` / `false` decisions, 
+While this library is primarily designed for `true` / `false` decisions,
 you can also use strings or integers by providing the possible values in the `cases` config option:
 
 ```yaml
@@ -151,6 +151,27 @@ entrypoint:
         criteria: product.restocking
     when@offsite:
     # ...
+```
+
+The `end` action also supports string and integer results, so you can build multi‑outcome flowcharts:
+
+```yaml
+entrypoint:
+    checker: app.checker.cache
+    when@true:
+        end: HIT
+    when@false:
+        end: MISS
+```
+
+```php
+$outcome = $runner->satisfies($request, $flowchart, $context);
+
+// $outcome is the string "HIT" or "MISS"
+$response = match ($outcome) {
+    'HIT' => $this->buildCachedResponse($context),
+    'MISS' => $this->buildFreshResponse($context),
+};
 ```
 
 ## Decorate your checkers

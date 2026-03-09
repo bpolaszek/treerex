@@ -12,6 +12,7 @@ Declaratively describe complex decision trees ("flowcharts") in *YAML* and run t
 - 🔍 **Full observability** – inspect the last node, the *full decision history*, and enriched *context*.
 - 🧪 **Test‑friendly** – feed any subject + context, assert the final result and the reasons attached in context.
 - 🧠 **Business‑driven** – Product Owners can reason about the YAML flowchart *without reading PHP*.
+- ⚡ **Side effects** – trigger external actions (dispatch messages, write to cache, …) alongside decisions.
 
 ## What it looks like
 

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace BenTools\TreeRex\Definition;
 
 use BenTools\TreeRex\Action\Action;
+use BenTools\TreeRex\Action\WithSideEffect;
 use UnitEnum;
 
 /**
@@ -28,7 +29,7 @@ final readonly class DecisionNode
     /**
      * @internal
      */
-    public function whenResultIs(string|bool|int|UnitEnum $result): DecisionNode|Action
+    public function whenResultIs(string|bool|int|UnitEnum $result): DecisionNode|Action|WithSideEffect
     {
         return $this->cases->get($result);
     }
