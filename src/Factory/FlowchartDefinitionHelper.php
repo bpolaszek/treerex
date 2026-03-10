@@ -46,6 +46,7 @@ final readonly class FlowchartDefinitionHelper
         'goto',
         'error',
         'use',
+        'sideEffect',
     ];
     private const array FLOWCHART_ACTION_KEYS = ['end', 'goto', 'error'];
 
@@ -83,12 +84,14 @@ final readonly class FlowchartDefinitionHelper
             ->setAllowedTypes('label', ['string', 'null'])
             ->setAllowedTypes('use', ['string', 'null'])
             ->setAllowedTypes('cases', ['(bool|int|string|UnitEnum)[]', 'null'])
-            ->setAllowedTypes('end', ['bool', 'array'])
+            ->setAllowedTypes('end', ['bool', 'string', 'int', 'array'])
             ->setAllowedTypes('error', ['string', 'array'])
             ->setAllowedTypes('goto', ['string', 'array'])
+            ->setAllowedTypes('sideEffect', ['string', 'array'])
             ->setAllowedValues('end', self::validateEnd(...))
             ->setAllowedValues('error', self::validateError(...))
-            ->setAllowedValues('goto', self::validateGoto(...));
+            ->setAllowedValues('goto', self::validateGoto(...))
+            ->setAllowedValues('sideEffect', self::validateSideEffect(...));
     }
 
     /**
@@ -135,8 +138,8 @@ final readonly class FlowchartDefinitionHelper
             throw new InvalidOptionsException('The `end` node must contain either `result` or `context`.');
         }
 
-        if (!in_array(get_debug_type($end['result'] ?? null), ['bool', 'null'], true)) {
-            throw new InvalidOptionsException('`end[result]` should be either `bool` or `null`.');
+        if (!in_array(get_debug_type($end['result'] ?? null), ['bool', 'string', 'int', 'null'], true)) {
+            throw new InvalidOptionsException('`end[result]` should be either `bool`, `string`, `int` or `null`.');
         }
 
         if (!in_array(get_debug_type($end['context'] ?? null), ['array', 'null'], true)) {
@@ -195,6 +198,35 @@ final readonly class FlowchartDefinitionHelper
 
         if (!in_array(get_debug_type($goto['context'] ?? null), ['array', 'null'], true)) {
             throw new InvalidOptionsException('`goto[context]` should be either `array` or `null`.');
+        }
+
+        return true;
+    }
+
+    /**
+     * @param string|array{id: string, timing?: string, context?: array<string, mixed>}|null $sideEffect
+     */
+    private static function validateSideEffect(string|array|null $sideEffect): bool
+    {
+        if (!is_array($sideEffect)) {
+            return true;
+        }
+
+        $keys = array_keys($sideEffect);
+        if (!array_all($keys, fn (string $key) => in_array($key, ['id', 'timing', 'context'], true))) {
+            throw new InvalidOptionsException('The `sideEffect` node must contain either `id`, `timing` or `context`.');
+        }
+
+        if ('string' !== get_debug_type($sideEffect['id'] ?? null)) {
+            throw new InvalidOptionsException('`sideEffect[id]` should be a `string`.');
+        }
+
+        if (!in_array($sideEffect['timing'] ?? 'before', ['before', 'after'], true)) {
+            throw new InvalidOptionsException('`sideEffect[timing]` should be either `before` or `after`.');
+        }
+
+        if (!in_array(get_debug_type($sideEffect['context'] ?? null), ['array', 'null'], true)) {
+            throw new InvalidOptionsException('`sideEffect[context]` should be either `array` or `null`.');
         }
 
         return true;

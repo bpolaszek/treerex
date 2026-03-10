@@ -191,7 +191,7 @@ describe('Flowchart Factory Validation', function () {
 
         $invalidCases = [
             ['when@true' => ['end' => ['foo' => 'bar']]], // <-- Invalid keys in end definition
-            ['when@true' => ['end' => ['result' => 'nope']]], // <-- Invalid type for end[result]
+            ['when@true' => ['end' => ['result' => ['nested']]]], // <-- Invalid type for end[result]
             ['when@true' => ['end' => ['context' => 'nope']]], // <-- Invalid type for end[context]
         ];
 

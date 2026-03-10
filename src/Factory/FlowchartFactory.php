@@ -9,10 +9,12 @@ use BenTools\TreeRex\Action\EndFlow;
 use BenTools\TreeRex\Action\GotoNode;
 use BenTools\TreeRex\Action\RaiseError;
 use BenTools\TreeRex\Action\UnhandledStep;
+use BenTools\TreeRex\Action\WithSideEffect;
 use BenTools\TreeRex\Definition\Cases;
 use BenTools\TreeRex\Definition\DecisionNode;
 use BenTools\TreeRex\Definition\Flowchart;
 use BenTools\TreeRex\Exception\FlowchartBuildException;
+use BenTools\TreeRex\SideEffect\SideEffectTiming;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 use UnitEnum;
 
@@ -75,7 +77,7 @@ final readonly class FlowchartFactory implements FlowchartFactoryInterface
      * @param ReusableBlockDefinition[]                            $blocks
      * @param FlowchartOptions                                     $options
      */
-    private function buildStep(bool|int|string|UnitEnum|array|null $data, array $blocks, array $options): Action|DecisionNode
+    private function buildStep(bool|int|string|UnitEnum|array|null $data, array $blocks, array $options): Action|DecisionNode|WithSideEffect
     {
         if (null === $data) {
             return new UnhandledStep();
@@ -101,12 +103,18 @@ final readonly class FlowchartFactory implements FlowchartFactoryInterface
         $exceptCases = $this->decisionNodeResolver->resolve($exceptCases);
         $data = [...$exceptCases, ...$onlyCases];
 
-        return match (true) {
+        $action = match (true) {
             array_key_exists('end', $data) => FlowchartDefinitionHelper::normalizeEnd($data['end']),
             array_key_exists('error', $data) => new RaiseError(...(array) $data['error']),
             array_key_exists('goto', $data) => new GotoNode(...(array) $data['goto']),
             default => $this->buildDecisionNode($data, $blocks, $options), // @phpstan-ignore argument.type
         };
+
+        if ($action instanceof Action && array_key_exists('sideEffect', $data)) {
+            $action = self::wrapWithSideEffect($action, $data['sideEffect']);
+        }
+
+        return $action;
     }
 
     /**
@@ -140,5 +148,22 @@ final readonly class FlowchartFactory implements FlowchartFactoryInterface
         }
 
         return $decisionNode;
+    }
+
+    /**
+     * @param string|array{id: string, timing?: string, context?: array<string, mixed>} $sideEffect
+     */
+    private static function wrapWithSideEffect(Action $action, string|array $sideEffect): WithSideEffect
+    {
+        if (!is_array($sideEffect)) {
+            return new WithSideEffect($action, $sideEffect);
+        }
+
+        return new WithSideEffect(
+            $action,
+            $sideEffect['id'],
+            SideEffectTiming::from($sideEffect['timing'] ?? 'before'),
+            $sideEffect['context'] ?? [],
+        );
     }
 }

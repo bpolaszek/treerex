@@ -5,12 +5,16 @@ declare(strict_types=1);
 namespace BenTools\TreeRex\Runner;
 
 use BenTools\TreeRex\Action\Action;
+use BenTools\TreeRex\Action\WithSideEffect;
 use BenTools\TreeRex\Checker\CheckerInterface;
 use BenTools\TreeRex\Checker\ExpressionLanguageChecker;
 use BenTools\TreeRex\Definition\DecisionNode;
 use BenTools\TreeRex\Definition\Flowchart;
 use BenTools\TreeRex\Exception\FlowchartRuntimeException;
+use BenTools\TreeRex\Exception\SideEffectException;
 use BenTools\TreeRex\Exception\SkippedSteps;
+use BenTools\TreeRex\SideEffect\SideEffectInterface;
+use BenTools\TreeRex\SideEffect\SideEffectTiming;
 use BenTools\TreeRex\Utils\ServiceLocator;
 use Exception;
 use Psr\Container\ContainerInterface;
@@ -66,6 +70,7 @@ final readonly class FlowchartRunner implements FlowchartRunnerInterface
         try {
             return match (true) {
                 $next instanceof DecisionNode => $this->process($state),
+                $next instanceof WithSideEffect => $this->processWithSideEffect($next, $state),
                 $next instanceof Action => $next($state),
             };
         } catch (SkippedSteps $e) {
@@ -74,6 +79,38 @@ final readonly class FlowchartRunner implements FlowchartRunnerInterface
 
             return $this->process($state->with($next, checker: $this->resolveCheckerService($next->checkerServiceId)));
         }
+    }
+
+    private function processWithSideEffect(WithSideEffect $withSideEffect, RunnerState $state): bool|int|string|UnitEnum
+    {
+        $sideEffect = $this->resolveSideEffect($withSideEffect->sideEffectServiceId);
+        $state = $state->withAppendedContext($withSideEffect->context);
+
+        if (SideEffectTiming::BEFORE === $withSideEffect->timing) {
+            $this->executeSideEffect($sideEffect, $state);
+        }
+
+        $result = ($withSideEffect->action)($state);
+
+        if (SideEffectTiming::AFTER === $withSideEffect->timing) {
+            $this->executeSideEffect($sideEffect, $state);
+        }
+
+        return $result;
+    }
+
+    private function executeSideEffect(SideEffectInterface $sideEffect, RunnerState $state): void
+    {
+        try {
+            $sideEffect->execute($state);
+        } catch (Exception $e) {
+            throw new SideEffectException($state, $e->getMessage(), previous: $e);
+        }
+    }
+
+    private function resolveSideEffect(string $sideEffectServiceId): SideEffectInterface
+    {
+        return $this->serviceLocator->get($sideEffectServiceId); // @phpstan-ignore return.type
     }
 
     private function resolveFlowchart(string $flowchartServiceId): Flowchart

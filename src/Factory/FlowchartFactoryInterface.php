@@ -23,12 +23,18 @@ use UnitEnum;
  *     id?: string,
  *     label?: string,
  *     use?: string,
- *     end?: EndDefinition|bool,
+ *     end?: EndDefinition|bool|string|int,
  *     error?: ErrorDefinition|string,
  *     goto?: GotoDefinition|string,
+ *     sideEffect?: SideEffectDefinition|string,
  * }
  * @phpstan-type EndDefinition array{
- *     result?: bool,
+ *     result?: bool|string|int,
+ *     context?: array<string, mixed>,
+ * }
+ * @phpstan-type SideEffectDefinition array{
+ *     id: string,
+ *     timing?: string,
  *     context?: array<string, mixed>,
  * }
  * @phpstan-type ErrorDefinition array{

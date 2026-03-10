@@ -7,6 +7,7 @@ namespace BenTools\TreeRex\Definition;
 use BackedEnum;
 use BenTools\TreeRex\Action\Action;
 use BenTools\TreeRex\Action\UnhandledStep;
+use BenTools\TreeRex\Action\WithSideEffect;
 use BenTools\TreeRex\Exception\FlowchartBuildException;
 use IteratorAggregate;
 use RuntimeException;
@@ -23,12 +24,12 @@ use function sprintf;
 /**
  * @internal
  *
- * @implements IteratorAggregate<string|bool|int|UnitEnum, DecisionNode|Action>
+ * @implements IteratorAggregate<string|bool|int|UnitEnum, DecisionNode|Action|WithSideEffect>
  */
 final class Cases implements IteratorAggregate
 {
     /**
-     * @var array{0: string|bool|int|UnitEnum, 1: DecisionNode|Action}[]
+     * @var array{0: string|bool|int|UnitEnum, 1: DecisionNode|Action|WithSideEffect}[]
      */
     public private(set) array $conditions = [];
 
@@ -39,7 +40,7 @@ final class Cases implements IteratorAggregate
     {
     }
 
-    public function when(string $decisionNodeId, string|bool|int|UnitEnum $result, DecisionNode|Action $next): void
+    public function when(string $decisionNodeId, string|bool|int|UnitEnum $result, DecisionNode|Action|WithSideEffect $next): void
     {
         if (array_find($this->conditions, fn (array $condition) => $condition[0] === $result)) {
             throw new FlowchartBuildException(sprintf('`%s`: Case `%s` is already defined.', $decisionNodeId, self::stringify($result)));
@@ -47,7 +48,7 @@ final class Cases implements IteratorAggregate
         $this->conditions[] = [$result, $next];
     }
 
-    public function get(string|bool|int|UnitEnum $result): DecisionNode|Action
+    public function get(string|bool|int|UnitEnum $result): DecisionNode|Action|WithSideEffect
     {
         [, $next] = array_find($this->conditions, fn (array $condition) => $condition[0] === $result)
             ?? throw new RuntimeException(sprintf('No case found for result: `%s`.', self::stringify($result)));
